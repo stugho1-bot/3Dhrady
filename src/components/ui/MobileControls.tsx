@@ -1,0 +1,63 @@
+import { useRef, useState } from 'react';
+import { useGameStore } from '../../store/useGameStore';
+
+export const MobileControls = () => {
+    const { setJoystick, setJumping } = useGameStore();
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [touchId, setTouchId] = useState<number | null>(null);
+    const center = useRef({ x: 0, y: 0 });
+    const maxRadius = 50;
+
+    return (
+        <>
+            {/* Joystick Area */}
+            <div
+                className="absolute bottom-10 left-10 w-32 h-32 bg-white/10 rounded-full backdrop-blur-sm border-2 border-white/20 touch-none flex items-center justify-center pointer-events-auto"
+                onTouchStart={(e) => {
+                    const touch = e.changedTouches[0];
+                    setTouchId(touch.identifier);
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    center.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                }}
+                onTouchMove={(e) => {
+                    // Check touch id
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === touchId) {
+                            const touch = e.changedTouches[i];
+                            const dx = touch.clientX - center.current.x;
+                            const dy = touch.clientY - center.current.y;
+                            const dist = Math.min(Math.sqrt(dx * dx + dy * dy), maxRadius);
+                            const angle = Math.atan2(dy, dx);
+                            const x = Math.cos(angle) * dist;
+                            const y = Math.sin(angle) * dist;
+                            setPosition({ x, y });
+                            setJoystick(x / maxRadius, -y / maxRadius);
+                        }
+                    }
+                }}
+                onTouchEnd={() => {
+                    setTouchId(null);
+                    setPosition({ x: 0, y: 0 });
+                    setJoystick(0, 0);
+                }}
+            >
+                {/* Stick */}
+                <div
+                    className="w-12 h-12 bg-white/50 rounded-full shadow-lg"
+                    style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+                />
+            </div>
+
+            {/* Jump Button */}
+            <button
+                className="absolute bottom-10 right-10 w-20 h-20 bg-white/20 rounded-full backdrop-blur-sm border-2 border-white/20 active:bg-white/40 touch-none pointer-events-auto flex items-center justify-center font-bold text-white select-none"
+                onTouchStart={() => setJumping(true)}
+                onTouchEnd={() => setJumping(false)}
+                onMouseDown={() => setJumping(true)}
+                onMouseUp={() => setJumping(false)}
+            >
+                JUMP
+            </button>
+        </>
+    );
+};
