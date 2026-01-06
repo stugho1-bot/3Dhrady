@@ -59,9 +59,11 @@ interface GameState {
     // Mobile Controls
     joystick: { x: number; y: number };
     isJumping: boolean;
+    touchDelta: { x: number; y: number };
 
     setJoystick: (x: number, y: number) => void;
     setJumping: (jumping: boolean) => void;
+    setTouchDelta: (x: number, y: number) => void;
 
     saveScore: (name: string) => void;
     loadLeaderboard: () => void;
@@ -122,6 +124,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     isJumping: false,
     setJoystick: (x, y) => set({ joystick: { x, y } }),
     setJumping: (jumping) => set({ isJumping: jumping }),
+    touchDelta: { x: 0, y: 0 },
+    setTouchDelta: (x, y) => set({ touchDelta: { x, y } }),
 
     loadLeaderboard: () => {
         try {

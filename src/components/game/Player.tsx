@@ -17,7 +17,7 @@ export const Player = () => {
     const [, get] = useKeyboardControls();
     const {
         joystick, isJumping, setCrouching, isCrouching,
-        setAimedBlock, setXRayActive
+        setAimedBlock, setXRayActive, touchDelta, setTouchDelta
     } = useGameStore();
     const { camera, scene, raycaster } = useThree();
     const { world } = useRapier();
@@ -128,6 +128,16 @@ export const Player = () => {
         if (grabbedBody.current) {
             const holdPos = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(2));
             grabbedBody.current.setNextKinematicTranslation(holdPos);
+        }
+
+        // --- Mobile Camera Rotation ---
+        if (touchDelta.x !== 0 || touchDelta.y !== 0) {
+            const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+            euler.y -= touchDelta.x * 0.01;
+            euler.x -= touchDelta.y * 0.01;
+            euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.x));
+            camera.quaternion.setFromEuler(euler);
+            setTouchDelta(0, 0);
         }
 
         // --- Movement ---
