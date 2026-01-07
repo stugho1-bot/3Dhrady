@@ -10,6 +10,8 @@ export const MobileControls = () => {
 
     // Camera Touchpad State
     const lastTouch = useRef<{ x: number, y: number } | null>(null);
+    const touchStartTime = useRef<number>(0);
+    const touchStartPos = useRef<{ x: number, y: number } | null>(null);
 
     return (
         <div className="fixed inset-0 pointer-events-none select-none touch-none">
@@ -18,9 +20,10 @@ export const MobileControls = () => {
                 className="absolute top-0 right-0 w-1/2 h-full pointer-events-auto touch-none"
                 onTouchStart={(e) => {
                     const touch = e.targetTouches[0];
-                    lastTouch.current = { x: touch.clientX, y: touch.clientY };
-                    // Swing trigger on tap/start
-                    triggerSwing();
+                    const pos = { x: touch.clientX, y: touch.clientY };
+                    lastTouch.current = pos;
+                    touchStartPos.current = pos;
+                    touchStartTime.current = Date.now();
                 }}
                 onTouchMove={(e) => {
                     if (!lastTouch.current) return;
@@ -34,8 +37,21 @@ export const MobileControls = () => {
 
                     lastTouch.current = { x: touch.clientX, y: touch.clientY };
                 }}
-                onTouchEnd={() => {
+                onTouchEnd={(e) => {
+                    if (touchStartPos.current) {
+                        const touch = e.changedTouches[0];
+                        const duration = Date.now() - touchStartTime.current;
+                        const dx = touch.clientX - touchStartPos.current.x;
+                        const dy = touch.clientY - touchStartPos.current.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        // Industry standards for Tap: < 200ms and < 30px movement
+                        if (duration < 200 && distance < 30) {
+                            triggerSwing();
+                        }
+                    }
                     lastTouch.current = null;
+                    touchStartPos.current = null;
                 }}
             />
 
