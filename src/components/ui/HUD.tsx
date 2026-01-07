@@ -100,9 +100,25 @@ export const HUD = () => {
             )}
 
             {/* Hrad Name & Settings Button - Top Left */}
-            <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', gap: '10px' }}>
-                <div style={metricStyle}>{getLevelName(level)}</div>
-                <button style={buttonStyle} onClick={() => setShowSettings(true)}>⚙️</button>
+            <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', flexDirection: 'column', gap: '10px', pointerEvents: 'auto' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={metricStyle}>{getLevelName(level)}</div>
+                    <button style={buttonStyle} onClick={() => setShowSettings(true)}>⚙️</button>
+                </div>
+                {/* Retry Level Button moved here for better mobile reach/UX */}
+                <button
+                    style={{
+                        background: 'rgba(153, 0, 0, 0.8)', color: 'white', fontWeight: 'bold',
+                        padding: '10px 20px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.3)',
+                        cursor: 'pointer', textTransform: 'uppercase', width: 'fit-content', fontSize: '12px'
+                    }}
+                    onClick={() => {
+                        const state = useGameStore.getState();
+                        state.startLevel(state.level);
+                    }}
+                >
+                    RETRY LEVEL
+                </button>
             </div>
 
             {/* Crosshair */}
@@ -117,19 +133,6 @@ export const HUD = () => {
                 <div style={metricStyle}>🧱 BLOCKS: {blocksDestroyed || 0}</div>
                 <div style={metricStyle}>🏆 SCORE: {score || 0}</div>
 
-                <button
-                    style={{
-                        background: 'rgba(153, 0, 0, 0.8)', color: 'white', fontWeight: 'bold',
-                        padding: '10px 20px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.3)',
-                        cursor: 'pointer', textTransform: 'uppercase'
-                    }}
-                    onClick={() => {
-                        const state = useGameStore.getState();
-                        state.startLevel(state.level);
-                    }}
-                >
-                    RETRY LEVEL
-                </button>
             </div>
 
             {/* Settings Modal */}

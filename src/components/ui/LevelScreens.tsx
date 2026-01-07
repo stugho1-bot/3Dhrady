@@ -32,38 +32,38 @@ export const LevelComplete = () => {
 
                 {/* Header */}
                 <div className="text-center">
-                    <h1 className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-yellow-400 to-orange-600 drop-shadow-sm uppercase tracking-tighter">
+                    <h1 className="text-4xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-br from-yellow-400 to-orange-600 drop-shadow-sm uppercase tracking-tighter">
                         {getLevelName(level)}
                     </h1>
-                    <div className="text-xl font-bold text-white/50 tracking-[0.2em] uppercase mt-2">Mission Accomplished</div>
+                    <div className="text-sm md:text-xl font-bold text-white/50 tracking-[0.2em] uppercase mt-2">Mission Accomplished</div>
                 </div>
 
                 {/* Stats Breakdown */}
-                <div className="w-full grid grid-cols-3 gap-4">
-                    <div className="bg-white/5 p-4 rounded-2xl border border-white/5 text-center">
+                <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                    <div className="bg-white/5 p-3 md:p-4 rounded-2xl border border-white/5 text-center">
                         <div className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1">Base Time</div>
-                        <div className="text-2xl font-black text-white">{((Date.now() - startTime) / 1000).toFixed(1)}s</div>
+                        <div className="text-xl md:text-2xl font-black text-white">{((Date.now() - startTime) / 1000).toFixed(1)}s</div>
                     </div>
-                    <div className="bg-yellow-400/10 p-4 rounded-2xl border border-yellow-400/20 text-center">
+                    <div className="bg-yellow-400/10 p-3 md:p-4 rounded-2xl border border-yellow-400/20 text-center">
                         <div className="text-[10px] font-bold text-yellow-500/60 uppercase tracking-[0.2em] mb-1">Bonus</div>
-                        <div className="text-2xl font-black text-yellow-400">-{Math.floor(blocksDestroyed / 10)}s</div>
+                        <div className="text-xl md:text-2xl font-black text-yellow-400">-{Math.floor(blocksDestroyed / 10)}s</div>
                     </div>
-                    <div className="bg-cyan-400/10 p-4 rounded-2xl border border-cyan-400/20 text-center">
+                    <div className="bg-cyan-400/10 p-3 md:p-4 rounded-2xl border border-cyan-400/20 text-center">
                         <div className="text-[10px] font-bold text-cyan-400/60 uppercase tracking-[0.2em] mb-1">Final</div>
-                        <div className="text-2xl font-black text-cyan-400">{Math.max(0.1, ((Date.now() - startTime) / 1000) - Math.floor(blocksDestroyed / 10)).toFixed(1)}s</div>
+                        <div className="text-xl md:text-2xl font-black text-cyan-400">{Math.max(0.1, ((Date.now() - startTime) / 1000) - Math.floor(blocksDestroyed / 10)).toFixed(1)}s</div>
                     </div>
                 </div>
 
                 {/* Score Section */}
                 {!submitted ? (
                     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
-                        <div className="bg-black/40 p-6 rounded-2xl border border-white/10">
-                            <label className="block text-xs font-bold text-white/40 mb-3 uppercase tracking-widest text-center">Hall of Fame</label>
+                        <div className="bg-black/40 p-4 md:p-6 rounded-2xl border border-white/10">
+                            <label className="block text-[10px] font-bold text-white/40 mb-3 uppercase tracking-widest text-center">Hall of Fame</label>
                             <input
                                 autoFocus
                                 type="text"
                                 placeholder="YOUR NAME"
-                                className="w-full bg-transparent border-b-2 border-white/20 text-center text-3xl p-2 text-white focus:outline-none focus:border-yellow-400 placeholder-white/10 uppercase font-black"
+                                className="w-full bg-transparent border-b-2 border-white/20 text-center text-xl md:text-3xl p-2 text-white focus:outline-none focus:border-yellow-400 placeholder-white/10 uppercase font-black"
                                 value={playerName}
                                 onChange={(e) => setPlayerNameState(e.target.value.toUpperCase())}
                                 maxLength={12}
@@ -72,15 +72,15 @@ export const LevelComplete = () => {
                         <button
                             type="submit"
                             disabled={!playerName.trim()}
-                            className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-black py-4 rounded-xl uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 disabled:hover:scale-100"
+                            className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-black py-3 md:py-4 rounded-xl uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 disabled:hover:scale-100"
                         >
                             Save Record
                         </button>
                     </form>
                 ) : (
-                    <div className="w-full bg-white/5 p-6 rounded-2xl border border-white/10 text-center">
-                        <div className="text-xs font-bold text-white/40 mb-2 uppercase tracking-widest">Next Level Passcode</div>
-                        <div className="text-4xl font-black text-cyan-400 tracking-wider font-mono">
+                    <div className="w-full bg-white/5 p-4 md:p-6 rounded-2xl border border-white/10 text-center">
+                        <div className="text-[10px] font-bold text-white/40 mb-2 uppercase tracking-widest">Next Level Passcode</div>
+                        <div className="text-2xl md:text-4xl font-black text-cyan-400 tracking-wider font-mono">
                             {nextPassword}
                         </div>
                     </div>
@@ -88,20 +88,20 @@ export const LevelComplete = () => {
 
                 {/* Leaderboard */}
                 <div className="w-full bg-black/40 rounded-2xl border border-white/10 overflow-hidden">
-                    <div className="bg-white/10 p-3 text-center text-xs font-bold text-white/60 uppercase tracking-widest border-b border-white/10">
+                    <div className="bg-white/10 p-3 text-center text-[10px] font-bold text-white/60 uppercase tracking-widest border-b border-white/10">
                         Top Rankers
                     </div>
-                    <div className="max-h-48 overflow-y-auto p-4 space-y-2">
+                    <div className="max-h-32 md:max-h-48 overflow-y-auto p-3 md:p-4 space-y-2">
                         {leaderboard.length === 0 ? (
                             <div className="text-center text-white/20 py-4 italic">No legends yet...</div>
                         ) : (
                             leaderboard.map((entry, i) => (
-                                <div key={i} className={`flex justify-between items-center p-3 rounded-lg ${entry.name === playerName && submitted ? 'bg-yellow-400/20 border border-yellow-400/30' : 'bg-white/5'}`}>
-                                    <div className="flex gap-4 items-center">
-                                        <span className={`text-lg font-black ${i === 0 ? 'text-yellow-400' : 'text-white/40'}`}>#{i + 1}</span>
-                                        <span className="font-bold text-white text-lg">{entry.name}</span>
+                                <div key={i} className={`flex justify-between items-center p-2 md:p-3 rounded-lg ${entry.name === playerName && submitted ? 'bg-yellow-400/20 border border-yellow-400/30' : 'bg-white/5'}`}>
+                                    <div className="flex gap-2 md:gap-4 items-center">
+                                        <span className={`text-base md:text-lg font-black ${i === 0 ? 'text-yellow-400' : 'text-white/40'}`}>#{i + 1}</span>
+                                        <span className="font-bold text-white text-sm md:text-lg truncate max-w-[80px] md:max-w-none">{entry.name}</span>
                                     </div>
-                                    <div className="flex gap-4 text-white/60 font-medium">
+                                    <div className="flex gap-2 md:gap-4 text-white/60 font-medium text-xs md:text-base">
                                         <span className="text-cyan-400/80">LVL {entry.level}</span>
                                         <span className="font-mono text-white/80">{Math.floor(entry.time / 60)}:{(Math.floor(entry.time) % 60).toString().padStart(2, '0')}</span>
                                     </div>
@@ -113,12 +113,12 @@ export const LevelComplete = () => {
 
                 {/* Action Button */}
                 <button
-                    className="w-full bg-white text-black text-2xl font-black py-5 rounded-2xl shadow-[0_10px_30px_rgba(255,255,255,0.1)] hover:shadow-[0_15px_40px_rgba(255,255,255,0.2)] hover:-translate-y-1 active:translate-y-0 active:scale-95 transition-all uppercase tracking-widest"
+                    className="w-full bg-white text-black text-xl md:text-2xl font-black py-4 md:py-5 rounded-2xl shadow-[0_10px_30px_rgba(255,255,255,0.1)] hover:shadow-[0_15px_40px_rgba(255,255,255,0.2)] hover:-translate-y-1 active:translate-y-0 active:scale-95 transition-all uppercase tracking-widest"
                     onClick={() => {
                         startLevel(level + 1);
                     }}
                 >
-                    Continue to Next Hrad
+                    Continue
                 </button>
             </div>
         </div>

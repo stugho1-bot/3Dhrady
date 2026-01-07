@@ -77,8 +77,14 @@ export const MobileControls = () => {
             {/* Jump Button */}
             <button
                 className="absolute bottom-10 right-10 w-20 h-20 bg-white/20 rounded-full backdrop-blur-sm border-2 border-white/20 active:bg-white/40 touch-none pointer-events-auto flex items-center justify-center font-bold text-white select-none z-10"
-                onTouchStart={() => setJumping(true)}
-                onTouchEnd={() => setJumping(false)}
+                onTouchStart={(e) => {
+                    e.preventDefault();
+                    setJumping(true);
+                }}
+                onTouchEnd={(e) => {
+                    e.preventDefault();
+                    setJumping(false);
+                }}
             >
                 JUMP
             </button>
