@@ -1,7 +1,11 @@
 import { Sky, Stars } from "@react-three/drei";
 import { RigidBody } from "@react-three/rapier";
+import { useGameStore } from "../../store/useGameStore";
+import { Car } from "./Car";
 
 export const World = () => {
+    const level = useGameStore(state => state.level);
+
     return (
         <>
             {/* Lights */}
@@ -14,6 +18,11 @@ export const World = () => {
 
             {/* Fog for depth */}
             <fog attach="fog" args={['#101010', 5, 40]} />
+
+            {/* Car Easter Egg - Spawn in Level 2, 4, 6... */}
+            {level % 2 === 0 && (
+                <Car position={[20, 0, 10]} />
+            )}
 
             {/* Ground Physics & Visuals */}
             <RigidBody type="fixed" position={[0, -1, 0]} restitution={0} friction={1}>

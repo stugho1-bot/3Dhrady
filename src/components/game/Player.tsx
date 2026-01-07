@@ -17,7 +17,8 @@ export const Player = () => {
     const [, get] = useKeyboardControls();
     const {
         joystick, isJumping, setCrouching, isCrouching,
-        setAimedBlock, setXRayActive, touchDelta, setTouchDelta
+        setAimedBlock, setXRayActive, touchDelta, setTouchDelta,
+        lastSwingTime, resetTimestamp
     } = useGameStore();
     const { camera, scene, raycaster } = useThree();
     const { world } = useRapier();
@@ -46,9 +47,6 @@ export const Player = () => {
         };
         const onUp = (e: KeyboardEvent) => {
             keysPressed.current.delete(e.code);
-
-            // Key release logic for X-Ray toggle is removed as it's now a switch
-
             if (e.code === 'ShiftLeft') setCrouching(false);
         };
         window.addEventListener('keydown', onDown);
@@ -59,10 +57,38 @@ export const Player = () => {
         };
     }, [setXRayActive, setCrouching]);
 
-    // Right Mouse Button for Grabbing
+    // Handle Swing from Store (Mobile/UI)
+    useEffect(() => {
+        if (lastSwingTime > 0) {
+            handleSwing();
+        }
+    }, [lastSwingTime]);
+
+    // Level Start Orientation Reset
+    useEffect(() => {
+        if (resetTimestamp > 0) {
+            // Reset Velocity
+            if (rigidBody.current) {
+                rigidBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                rigidBody.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                rigidBody.current.setRotation({ w: 1, x: 0, y: 0, z: 0 }, true);
+            }
+            // Point Camera at Castle
+            camera.position.set(0, 2, 20);
+            camera.lookAt(0, 2, 0);
+            // Also reset quaternion to avoid weirdness with PointerLockControls internal state
+            camera.quaternion.setFromEuler(new THREE.Euler(0, Math.PI, 0, 'YXZ'));
+        }
+    }, [resetTimestamp, camera]);
+
+    // Mouse Interaction (Desktop)
     useEffect(() => {
         const onMouseDown = (e: MouseEvent) => {
+            const isDesktop = !!document.pointerLockElement;
+
             if (e.button === 2) { // Right Click
+                if (!isDesktop) return; // Right click grab only for mouse/desktop
+
                 // Raycast to grab
                 raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
                 const intersects = raycaster.intersectObjects(scene.children, true);
@@ -70,7 +96,6 @@ export const Player = () => {
 
                 if (hit) {
                     const blockId = hit.object.userData.id;
-                    // Find the physics body for this block
                     world.forEachCollider((collider) => {
                         const body = collider.parent();
                         if (body && body.userData && (body.userData as any).id === blockId) {
@@ -81,7 +106,7 @@ export const Player = () => {
                     });
                 }
             } else if (e.button === 0) {
-                handleSwing();
+                if (isDesktop) handleSwing();
             }
         };
         const onMouseUp = (e: MouseEvent) => {

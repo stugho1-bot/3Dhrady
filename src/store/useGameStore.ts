@@ -84,6 +84,8 @@ interface GameState {
     setPlayerName: (name: string) => void;
 
     // Interaction & Mechanics
+    lastSwingTime: number;
+    triggerSwing: () => void;
     setCrouching: (crouching: boolean) => void;
     setAimedBlock: (id: string | null) => void;
 }
@@ -159,6 +161,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     setCrouching: (crouching) => set({ isCrouching: crouching }),
     aimedBlockId: null,
     setAimedBlock: (id) => set({ aimedBlockId: id }),
+    lastSwingTime: 0,
+    triggerSwing: () => set({ lastSwingTime: Date.now() }),
 
     saveScore: (name: string) => {
         const { level, startTime, blocksDestroyed, leaderboard } = get();

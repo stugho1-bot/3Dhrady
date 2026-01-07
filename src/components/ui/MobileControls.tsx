@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 
 export const MobileControls = () => {
-    const { setJoystick, setJumping, setTouchDelta } = useGameStore();
+    const { setJoystick, setJumping, setTouchDelta, triggerSwing } = useGameStore();
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [touchId, setTouchId] = useState<number | null>(null);
     const center = useRef({ x: 0, y: 0 });
@@ -19,6 +19,8 @@ export const MobileControls = () => {
                 onTouchStart={(e) => {
                     const touch = e.targetTouches[0];
                     lastTouch.current = { x: touch.clientX, y: touch.clientY };
+                    // Swing trigger on tap/start
+                    triggerSwing();
                 }}
                 onTouchMove={(e) => {
                     if (!lastTouch.current) return;
@@ -41,12 +43,14 @@ export const MobileControls = () => {
             <div
                 className="absolute bottom-10 left-10 w-32 h-32 bg-white/10 rounded-full backdrop-blur-sm border-2 border-white/20 touch-none flex items-center justify-center pointer-events-auto"
                 onTouchStart={(e) => {
+                    e.preventDefault(); // Prevent accidental swings/scrolls
                     const touch = e.changedTouches[0];
                     setTouchId(touch.identifier);
                     const rect = e.currentTarget.getBoundingClientRect();
                     center.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                 }}
                 onTouchMove={(e) => {
+                    e.preventDefault();
                     for (let i = 0; i < e.changedTouches.length; i++) {
                         if (e.changedTouches[i].identifier === touchId) {
                             const touch = e.changedTouches[i];

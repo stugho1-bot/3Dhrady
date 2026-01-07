@@ -31,6 +31,8 @@ export const HUD = () => {
         return () => clearTimeout(timer);
     }, [level]);
 
+    const [fpsStats, setFpsStats] = useState({ min: 999, max: 0, avg: 0, totalFrames: 0, sumFps: 0 });
+
     // FPS Counter logic
     useEffect(() => {
         if (!showFPS) return;
@@ -42,7 +44,23 @@ export const HUD = () => {
             frameCount++;
             const now = performance.now();
             if (now >= lastTime + 1000) {
-                setFps(Math.round((frameCount * 1000) / (now - lastTime)));
+                const currentFps = Math.round((frameCount * 1000) / (now - lastTime));
+                setFps(currentFps);
+
+                setFpsStats(prev => {
+                    const newMin = Math.min(prev.min, currentFps);
+                    const newMax = Math.max(prev.max, currentFps);
+                    const newTotalFrames = prev.totalFrames + 1;
+                    const newSumFps = prev.sumFps + currentFps;
+                    return {
+                        min: newMin === 999 ? currentFps : newMin,
+                        max: newMax,
+                        totalFrames: newTotalFrames,
+                        sumFps: newSumFps,
+                        avg: Math.round(newSumFps / newTotalFrames)
+                    };
+                });
+
                 frameCount = 0;
                 lastTime = now;
             }
@@ -81,8 +99,16 @@ export const HUD = () => {
         <div id="hud-container" style={containerStyle}>
             {/* FPS Counter */}
             {showFPS && (
-                <div style={{ position: 'absolute', top: '10px', right: '10px', color: '#00ff00', fontSize: '12px' }}>
-                    FPS: {fps}
+                <div style={{
+                    position: 'absolute', top: '10px', right: '10px',
+                    color: '#00ff00', fontSize: '10px', textAlign: 'right',
+                    background: 'rgba(0,0,0,0.5)', padding: '5px', borderRadius: '4px'
+                }}>
+                    <div>FPS: {fps}</div>
+                    <div style={{ opacity: 0.7 }}>
+                        MIN: {fpsStats.min} MAX: {fpsStats.max}<br />
+                        AVG: {fpsStats.avg}
+                    </div>
                 </div>
             )}
 
