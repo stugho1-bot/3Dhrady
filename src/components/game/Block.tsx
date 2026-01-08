@@ -75,17 +75,15 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
         }
     });
 
+    const hasExploded = useRef(false);
+
     const onHit = (_fromExplosion = false) => {
-        // Logic for Hammer hit
+        if (shattered || exploding || hasExploded.current) return;
+
         if (type === 'portal') {
             useGameStore.getState().setStatus('LEVEL_COMPLETE');
             return;
         }
-
-        if (shattered || exploding) return;
-
-        // Anti-recursion / throttle
-        // If fromExplosion, we accept it.
 
         // Capture position for debris
         let currentPos = position;
@@ -102,7 +100,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             setShowAnimeFirework(true);
         } else if (type === 'explosive') {
             if (_fromExplosion) {
-                // If hit by another explosion, just shatter without detonating
+                // If hit by another explosion, just shatter without detonating to avoid recursion
                 setShattered(true);
                 incBlocksDestroyed();
                 setInteracted(true);
@@ -119,21 +117,28 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     };
 
     const triggerExplosion = (pos: THREE.Vector3) => {
+        if (hasExploded.current) return;
+        hasExploded.current = true;
+
         debugLogger.log('EXPLOSION', 'Explosion triggered', {
             position: [pos.x, pos.y, pos.z],
             type: 'small',
             radius: 1.5
         });
 
-        const radius = 1.5; // Only affect immediate neighbors
+        const radius = 1.5;
         const { shakeCamera } = useGameStore.getState();
 
-        shakeCamera(0.2);
+        // Recursion safe camera shake
+        try {
+            shakeCamera(0.2);
+        } catch (e) {
+            console.warn("Camera shake failed during explosion chain");
+        }
 
-        // COLLECT: Gather candidates without any processing/logic to avoid iterator invalidation
+        // COLLECT: Gather candidates without any processing/logic
         const candidates: any[] = [];
         world.forEachCollider((collider: any) => {
-            // Minimal check inside the loop
             candidates.push(collider);
         });
 
@@ -147,29 +152,32 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             if (!body) continue;
 
             const bodyPos = body.translation();
-            const distSq =
-                Math.pow(bodyPos.x - pos.x, 2) +
-                Math.pow(bodyPos.y - pos.y, 2) +
-                Math.pow(bodyPos.z - pos.z, 2);
+            const dx = bodyPos.x - pos.x;
+            const dy = bodyPos.y - pos.y;
+            const dz = bodyPos.z - pos.z;
+            const distSq = dx * dx + dy * dy + dz * dz;
 
             if (distSq > radius * radius) continue;
 
-            const userData = body.userData as { onHit?: (fromExplo?: boolean) => void, isBlock?: boolean, isPlayer?: boolean, isDebris?: boolean };
+            const userData = body.userData as { onHit?: (fromExplo?: boolean) => void, isBlock?: boolean, isPlayer?: boolean, isDebris?: boolean, id?: string };
             if (!userData) continue;
 
+            // Don't hit ourselves
+            if (userData.id === blockId) continue;
+
             if (userData.isBlock && userData.onHit && !userData.isDebris) {
-                // Limit chain reaction size
-                if (affectedBlocks < 9) {
+                // Limit chain reaction size per explosion to avoid stack overflow
+                if (affectedBlocks < 6) { // Reduced from 9 for safety
                     affectedBlocks++;
-                    hits.push(() => userData.onHit?.(true));
+                    const hitFn = userData.onHit;
+                    hits.push(() => hitFn(true));
                 }
             } else if (!userData.isPlayer) {
-                // Debris / Items
                 const dist = Math.sqrt(distSq);
-                const force = 0.02;
-                const dirX = (bodyPos.x - pos.x) / (dist || 1);
-                const dirY = (bodyPos.y - pos.y) / (dist || 1);
-                const dirZ = (bodyPos.z - pos.z) / (dist || 1);
+                const force = 0.015; // Slightly reduced force
+                const dirX = dx / (dist || 1);
+                const dirY = dy / (dist || 1);
+                const dirZ = dz / (dist || 1);
 
                 if (!isNaN(dirX) && !isNaN(dirY) && !isNaN(dirZ)) {
                     impulses.push({
@@ -184,17 +192,17 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             }
         }
 
-        // EXECUTE: Apply changes
-        hits.forEach(h => h());
-        impulses.forEach(({ body, impulse }) => {
-            try {
-                if (body && body.isValid && body.isValid()) {
-                    body.applyImpulse(impulse, true);
-                }
-            } catch (e) {
-                // Body might be gone
-            }
-        });
+        // EXECUTE: Apply changes deferred to next tick to break call stack if many triggers happen
+        setTimeout(() => {
+            hits.forEach(h => h());
+            impulses.forEach(({ body, impulse }) => {
+                try {
+                    if (body && body.isValid && body.isValid()) {
+                        body.applyImpulse(impulse, true);
+                    }
+                } catch (e) { }
+            });
+        }, 0);
     };
 
     return (
