@@ -46,13 +46,15 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
     const isXRayActive = useGameStore(state => state.isXRayActive);
     const isAimed = useGameStore(state => state.aimedBlockId === blockId);
     const isDestroyedGlobally = useGameStore(state => !!state.destroyedBlocks[blockId]);
+    const isClearedGlobally = useGameStore(state => !!state.clearedBlocks?.[blockId]);
     const markBlockDestroyed = useGameStore(state => state.markBlockDestroyed);
+    const markBlockCleared = useGameStore(state => state.markBlockCleared);
 
     const [exploding, setExploding] = useState(false);
     const [showAnimeFirework, setShowAnimeFirework] = useState(false);
     // Initialize from global state to survive remounts
     const [shattered, setShattered] = useState(isDestroyedGlobally);
-    const [isRemoved, setIsRemoved] = useState(false);
+    const [isRemoved, setIsRemoved] = useState(isClearedGlobally);
     const [shatterPos, setShatterPos] = useState<[number, number, number] | null>(isDestroyedGlobally ? position : null);
     const [isFusing, setIsFusing] = useState(false);
     const meshRef = useRef<THREE.Mesh>(null);
@@ -62,7 +64,7 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
 
     // Portal blinking & TNT fuse blinking
     useFrame(({ clock }, delta) => {
-        if (isRemoved) return;
+        if (isRemoved || isClearedGlobally) return;
 
         if (meshRef.current) {
             const material = meshRef.current.material as THREE.MeshStandardMaterial;
@@ -89,11 +91,10 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
     const handleDetonation = () => {
         if (hasExploded.current) return;
 
-        // IMMEDIATE ACTION (Global Store)
-        markBlockDestroyed(blockId);
-
-        // DEFERRED ACTION (Safe Frame for visuals)
+        // DEFERRED ACTION (Safe Frame for essentials)
         setTimeout(() => {
+            // STABILITY FIX: Update store INSIDE timeout to prevent mid-frame unmount
+            markBlockDestroyed(blockId);
             setShattered(true);
             setExploding(true);
 
@@ -112,7 +113,7 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
     };
 
     const onHit = (_fromExplosion = false) => {
-        if (isRemoved || shattered || exploding || hasExploded.current || isProcessingHit.current || isDestroyedGlobally) return;
+        if (isRemoved || isClearedGlobally || shattered || exploding || hasExploded.current || isProcessingHit.current || isDestroyedGlobally) return;
         if (isFusing && !_fromExplosion) return;
 
         isProcessingHit.current = true;
@@ -131,13 +132,13 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
         }
         setShatterPos(currentPos);
 
-        // IMMEDIATE ACTION (Global Store)
-        if (type !== 'explosive' || _fromExplosion) {
-            markBlockDestroyed(blockId);
-        }
-
         // DEFERRED ACTION (Safe Frame)
         setTimeout(() => {
+            // STABILITY FIX: Update store INSIDE timeout
+            if (type !== 'explosive' || _fromExplosion) {
+                markBlockDestroyed(blockId);
+            }
+
             if (type === 'gold') {
                 setShattered(true);
                 incBlocksDestroyed();
@@ -213,6 +214,7 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
             }
         }
 
+        // STABILITY FIX: Increase deferment to a full frame (16ms)
         setTimeout(() => {
             hits.forEach(h => h());
             impulses.forEach(({ body, impulse }) => {
@@ -222,8 +224,16 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
                     }
                 } catch (e) { }
             });
-        }, 0);
+        }, 16);
     };
+
+    const handleClearDebris = () => {
+        setIsRemoved(true);
+        markBlockCleared(blockId);
+    };
+
+    // If fully cleared globally, don't render anything
+    if (isClearedGlobally) return null;
 
     // If destroyed or shattered on mount, hide the main block
     const shouldHideBlock = isDestroyedGlobally || shattered;
@@ -280,7 +290,7 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
                     position={shatterPos}
                     type={type}
                     color={COLORS[type]}
-                    onComplete={() => setIsRemoved(true)}
+                    onComplete={handleClearDebris}
                 />
             )}
         </group>

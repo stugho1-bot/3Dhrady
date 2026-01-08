@@ -91,6 +91,8 @@ interface GameState {
 
     destroyedBlocks: Record<string, boolean>;
     markBlockDestroyed: (id: string) => void;
+    clearedBlocks: Record<string, boolean>;
+    markBlockCleared: (id: string) => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -102,6 +104,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     blocksDestroyed: 0,
     leaderboard: [],
     destroyedBlocks: {},
+    clearedBlocks: {},
 
     addScore: (amount: number) => set((state) => ({ score: state.score + amount })),
 
@@ -112,7 +115,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         resetTimestamp: Date.now(),
         startTime: fullReset ? Date.now() : state.startTime,
         blocksDestroyed: 0,
-        destroyedBlocks: {}
+        destroyedBlocks: {},
+        clearedBlocks: {}
     })),
 
     startLevel: (level) => set((state) => ({
@@ -121,7 +125,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         resetTimestamp: Date.now(),
         startTime: Date.now(),
         blocksDestroyed: 0,
-        destroyedBlocks: {}
+        destroyedBlocks: {},
+        clearedBlocks: {}
     })),
 
     setStatus: (status) => set({ status }),
@@ -172,6 +177,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     markBlockDestroyed: (id: string) => set((state) => ({
         destroyedBlocks: { ...state.destroyedBlocks, [id]: true }
+    })),
+
+    markBlockCleared: (id: string) => set((state) => ({
+        clearedBlocks: { ...state.clearedBlocks, [id]: true }
     })),
 
     saveScore: (name: string) => {
