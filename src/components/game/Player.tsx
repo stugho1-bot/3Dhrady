@@ -1,7 +1,7 @@
 import { useKeyboardControls, PointerLockControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { RigidBody, CapsuleCollider, RapierRigidBody, useRapier } from "@react-three/rapier";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import * as THREE from "three";
 import { useGameStore } from "../../store/useGameStore";
 import { Hammer } from "./Hammer";
