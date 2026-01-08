@@ -9,7 +9,9 @@ import type { HammerRef } from "./Hammer";
 
 const SPEED = 5;
 const CROUCH_SPEED = 2;
-const JUMP_FORCE = 5;
+
+const JUMP_FORCE = 6;
+const INITIAL_POS: [number, number, number] = [0, 2, 20];
 
 export const Player = () => {
     const rigidBody = useRef<RapierRigidBody>(null);
@@ -21,10 +23,10 @@ export const Player = () => {
         lastSwingTime, resetTimestamp
     } = useGameStore();
     const { camera, scene, raycaster } = useThree();
-    const { world } = useRapier();
+    const { world, rapier } = useRapier();
 
     const direction = useRef(new THREE.Vector3());
-    const [isGrounded, setIsGrounded] = useState(false);
+    // isGrounded removed as it caused unnecessary re-renders
 
     // Grabbing State
     const grabbedBody = useRef<RapierRigidBody | null>(null);
@@ -170,8 +172,24 @@ export const Player = () => {
         const vel = rigidBody.current.linvel();
         direction.current.set(0, 0, 0);
 
+        // Grounding check using Raycast (more robust than collision events)
+        const translation = rigidBody.current.translation();
+        const rayOrigin = { x: translation.x, y: translation.y, z: translation.z };
+        const rayDir = { x: 0, y: -1, z: 0 };
+        const ray = new rapier.Ray(rayOrigin, rayDir);
+        // Hráčova výška je cca 1.0 (0.5 nahoru/dolů). Raycast ze středu.
+        // Correct castRay signature: ray, maxToi, solid, filterFlags, filterGroups, filterExcludeCollider, filterExcludeRigidBody
+        const hit = world.castRay(ray, 2.0, true, undefined, undefined, undefined, rigidBody.current);
+
+        // Handle potential property name differences in Rapier versions
+        const toi = (hit as any)?.toi ?? (hit as any)?.timeOfImpact;
+
+        const grounded = toi !== undefined && toi !== null && toi <= 1.1;
+        // setIsGrounded(grounded); // Removed
+
         const forwardVec = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
         forwardVec.y = 0; forwardVec.normalize();
+
         const rightVec = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
         rightVec.y = 0; rightVec.normalize();
 
@@ -188,29 +206,33 @@ export const Player = () => {
             direction.current.normalize().multiplyScalar(currentSpeed);
         }
 
-        rigidBody.current.setLinvel({
+        // Single velocity update to prevent horizontal movement from overriding vertical impulses
+        const finalVel = {
             x: direction.current.x,
             y: vel.y,
             z: direction.current.z
-        }, true);
+        };
 
-        if ((jump || isJumping) && isGrounded && !isCrouching) {
-            rigidBody.current.setLinvel({ x: vel.x, y: JUMP_FORCE, z: vel.z }, true);
-            setIsGrounded(false);
+        if ((jump || isJumping) && grounded && !isCrouching) {
+            finalVel.y = JUMP_FORCE;
+            // setIsGrounded(false);
         }
 
+        rigidBody.current.setLinvel(finalVel, true);
+
         // Sync Camera & Hammer
-        const translation = rigidBody.current.translation();
         if (!isNaN(translation.x)) {
             const { shakeIntensity, shakeCamera } = useGameStore.getState();
             const cameraY = isCrouching ? -0.2 : 0.5;
 
-            // Set Camera
-            camera.position.set(
-                translation.x + (Math.random() - 0.5) * shakeIntensity,
-                translation.y + cameraY + (Math.random() - 0.5) * shakeIntensity,
-                translation.z
-            );
+            // Set Camera with NaN safety
+            if (!isNaN(translation.x) && !isNaN(translation.y) && !isNaN(translation.z) && !isNaN(shakeIntensity)) {
+                camera.position.set(
+                    translation.x + (Math.random() - 0.5) * shakeIntensity,
+                    translation.y + cameraY + (Math.random() - 0.5) * shakeIntensity,
+                    translation.z
+                );
+            }
 
             // Immediately Sync Hammer to Camera
             if (hammerGroupRef.current) {
@@ -235,12 +257,12 @@ export const Player = () => {
                 mass={1}
                 type="dynamic"
                 ccd
-                position={[0, 2, 20]}
+                position={INITIAL_POS}
                 enabledRotations={[false, false, false]}
-                onCollisionEnter={() => setIsGrounded(true)}
+                friction={0}
                 userData={{ isPlayer: true }}
             >
-                <CapsuleCollider args={[isCrouching ? 0.2 : 0.5, 0.3]} />
+                <CapsuleCollider args={[isCrouching ? 0.2 : 0.5, 0.3]} friction={0} />
             </RigidBody>
             <group ref={hammerGroupRef}>
                 <Hammer ref={hammerRef} />

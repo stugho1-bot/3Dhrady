@@ -158,14 +158,20 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                 // Apply impulse to debris/other objects
                 const dist = Math.sqrt(distSq);
                 const force = 0.02;
-                impulses.push({
-                    body,
-                    impulse: {
-                        x: ((bodyPos.x - pos.x) / (dist || 1)) * force,
-                        y: ((bodyPos.y - pos.y) / (dist || 1)) * force + force,
-                        z: ((bodyPos.z - pos.z) / (dist || 1)) * force
-                    }
-                });
+                const dirX = (bodyPos.x - pos.x) / (dist || 1);
+                const dirY = (bodyPos.y - pos.y) / (dist || 1);
+                const dirZ = (bodyPos.z - pos.z) / (dist || 1);
+
+                if (!isNaN(dirX) && !isNaN(dirY) && !isNaN(dirZ)) {
+                    impulses.push({
+                        body,
+                        impulse: {
+                            x: dirX * force,
+                            y: dirY * force + force,
+                            z: dirZ * force
+                        }
+                    });
+                }
             }
         });
 

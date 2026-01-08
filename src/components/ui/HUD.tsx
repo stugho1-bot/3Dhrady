@@ -125,7 +125,7 @@ export const HUD = () => {
                 </div>
             )}
 
-            {/* Hrad Name & Settings Button - Top Left */}
+            {/* Hrad Name, Settings, Retry & Metrics - Top Left */}
             <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', flexDirection: 'column', gap: '10px', pointerEvents: 'auto' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={metricStyle}>{getLevelName(level)}</div>
@@ -145,20 +145,19 @@ export const HUD = () => {
                 >
                     RETRY LEVEL
                 </button>
+
+                {/* Moved Metrics Group: Time, Blocks, Score */}
+                <div id="hud-metrics-group" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '10px' }}>
+                    <div style={metricStyle}>⏰ TIME: {timeStr}</div>
+                    <div style={metricStyle}>🧱 BLOCKS: {blocksDestroyed || 0}</div>
+                    <div style={metricStyle}>🏆 SCORE: {score || 0}</div>
+                </div>
             </div>
 
             {/* Crosshair */}
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyItems: 'center', opacity: 0.6 }}>
                 <div style={{ position: 'absolute', width: '2px', height: '100%', background: 'white' }} />
                 <div style={{ position: 'absolute', width: '100%', height: '2px', background: 'white' }} />
-            </div>
-
-            {/* Bottom Left Group: Metrics & Retry */}
-            <div id="hud-metrics-group" style={{ position: 'absolute', left: '20px', bottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px', pointerEvents: 'auto' }}>
-                <div style={metricStyle}>⏰ TIME: {timeStr}</div>
-                <div style={metricStyle}>🧱 BLOCKS: {blocksDestroyed || 0}</div>
-                <div style={metricStyle}>🏆 SCORE: {score || 0}</div>
-
             </div>
 
             {/* Settings Modal */}
