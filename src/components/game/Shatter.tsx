@@ -47,7 +47,13 @@ export const Shatter = ({ position, type, color, onComplete }: ShatterProps) => 
     };
 
     const removePiece = (id: number) => {
-        setPieces(prev => prev.filter(p => p.id !== id));
+        setPieces(prev => {
+            const next = prev.filter(p => p.id !== id);
+            if (next.length === 0) {
+                onComplete();
+            }
+            return next;
+        });
         pieceRefs.current.delete(id);
     };
 

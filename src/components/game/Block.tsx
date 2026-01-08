@@ -1,5 +1,5 @@
 import { RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
-import { useRef, useState, useMemo, memo } from "react";
+import { useRef, useState, useMemo, memo, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGameStore } from "../../store/useGameStore";
@@ -52,15 +52,28 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
 
     const [exploding, setExploding] = useState(false);
     const [showAnimeFirework, setShowAnimeFirework] = useState(false);
+
     // Initialize from global state to survive remounts
     const [shattered, setShattered] = useState(isDestroyedGlobally);
     const [isRemoved, setIsRemoved] = useState(isClearedGlobally);
     const [shatterPos, setShatterPos] = useState<[number, number, number] | null>(isDestroyedGlobally ? position : null);
     const [isFusing, setIsFusing] = useState(false);
+
     const meshRef = useRef<THREE.Mesh>(null);
-    const hasExploded = useRef(false);
+    const hasExploded = useRef(isDestroyedGlobally);
     const isProcessingHit = useRef(false);
     const fuseTimerRef = useRef(0);
+
+    // Sync state with global store if changed externally (e.g. from explosion of another block)
+    useEffect(() => {
+        if (isDestroyedGlobally && !shattered) {
+            setShattered(true);
+            if (!shatterPos) setShatterPos(position);
+        }
+        if (isClearedGlobally && !isRemoved) {
+            setIsRemoved(true);
+        }
+    }, [isDestroyedGlobally, isClearedGlobally]);
 
     // Portal blinking & TNT fuse blinking
     useFrame(({ clock }, delta) => {
@@ -105,6 +118,7 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
                     currentPos = [t.x, t.y, t.z];
                 } catch (e) { }
             }
+            setShatterPos(currentPos);
 
             triggerExplosion(new THREE.Vector3(...(currentPos || position)));
             setIsFusing(false);
