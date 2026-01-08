@@ -1,6 +1,5 @@
 import { RigidBody, RapierRigidBody } from "@react-three/rapier";
 import { useState, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { AnimeFirework } from "./Effects";
 import { useGameStore } from "../../store/useGameStore";
