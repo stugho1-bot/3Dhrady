@@ -23,8 +23,6 @@ const COLORS: Record<BlockType, string> = {
     portal: '#00FF00'
 };
 
-// Explosion sphere removed as it was causing visual blowout
-
 
 export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps) => {
     const blockId = useMemo(() => id || `block-${position.join('-')}-${Math.random()}`, [id, position]);
@@ -44,6 +42,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     const [isFusing, setIsFusing] = useState(false);
     const [fuseTime, setFuseTime] = useState(0);
     const meshRef = useRef<THREE.Mesh>(null);
+    const hasExploded = useRef(false);
 
     // Portal blinking & TNT fuse blinking
     useFrame(({ clock }, delta) => {
@@ -62,7 +61,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                         setExploding(true);
                         triggerExplosion(new THREE.Vector3(...(shatterPos || position)));
                         setIsFusing(false);
-                        incBlocksDestroyed(); // Increment for exploding block itself
+                        incBlocksDestroyed();
                         return 0;
                     }
                     return next;
@@ -74,8 +73,6 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             }
         }
     });
-
-    const hasExploded = useRef(false);
 
     const onHit = (_fromExplosion = false) => {
         if (shattered || exploding || hasExploded.current) return;
@@ -99,14 +96,18 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             setInteracted(true);
             setShowAnimeFirework(true);
         } else if (type === 'explosive') {
-            if (_fromExplosion) {
-                // If hit by another explosion, just shatter without detonating to avoid recursion
+            if (scale > 0.8) {
+                if (_fromExplosion) {
+                    setShattered(true);
+                    incBlocksDestroyed();
+                    setInteracted(true);
+                } else {
+                    setIsFusing(true);
+                    setInteracted(true);
+                }
+            } else {
                 setShattered(true);
                 incBlocksDestroyed();
-                setInteracted(true);
-            } else {
-                // Only direct hammer hits trigger the fuse
-                setIsFusing(true);
                 setInteracted(true);
             }
         } else {
@@ -120,79 +121,65 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
         if (hasExploded.current) return;
         hasExploded.current = true;
 
-        debugLogger.log('EXPLOSION', 'Explosion triggered', {
-            position: [pos.x, pos.y, pos.z],
-            type: 'small',
-            radius: 1.5
-        });
-
         const radius = 1.5;
         const { shakeCamera } = useGameStore.getState();
 
-        // Recursion safe camera shake
         try {
             shakeCamera(0.2);
-        } catch (e) {
-            console.warn("Camera shake failed during explosion chain");
-        }
+        } catch (e) { }
 
-        // COLLECT: Gather candidates without any processing/logic
+        // 1. COLLECT: Gather candidates with distance info
         const candidates: any[] = [];
         world.forEachCollider((collider: any) => {
-            candidates.push(collider);
-        });
-
-        // PROCESS: Filter and calculate logic outside the physics loop
-        const hits: Array<() => void> = [];
-        const impulses: Array<{ body: any, impulse: { x: number, y: number, z: number } }> = [];
-        let affectedBlocks = 0;
-
-        for (const collider of candidates) {
             const body = collider.parent();
-            if (!body) continue;
-
+            if (!body) return;
             const bodyPos = body.translation();
             const dx = bodyPos.x - pos.x;
             const dy = bodyPos.y - pos.y;
             const dz = bodyPos.z - pos.z;
             const distSq = dx * dx + dy * dy + dz * dz;
 
-            if (distSq > radius * radius) continue;
+            if (distSq <= radius * radius) {
+                candidates.push({ collider, body, distSq, dx, dy, dz });
+            }
+        });
 
-            const userData = body.userData as { onHit?: (fromExplo?: boolean) => void, isBlock?: boolean, isPlayer?: boolean, isDebris?: boolean, id?: string };
-            if (!userData) continue;
+        // 2. SORT: Nearest first to ensure logic picks the closest 3 blocks
+        candidates.sort((a, b) => a.distSq - b.distSq);
 
-            // Don't hit ourselves
-            if (userData.id === blockId) continue;
+        // 3. PROCESS: Calculate hits (MAX 3) and impulses
+        const hits: Array<() => void> = [];
+        const impulses: Array<{ body: any, impulse: { x: number, y: number, z: number } }> = [];
+        let affectedBlocks = 0;
+
+        for (const can of candidates) {
+            const userData = can.body.userData as any;
+            if (!userData || userData.id === blockId) continue;
 
             if (userData.isBlock && userData.onHit && !userData.isDebris) {
-                // Limit chain reaction size per explosion to avoid stack overflow
-                if (affectedBlocks < 6) { // Reduced from 9 for safety
+                // USER REQUEST: Maximum 3 surrounding blocks destroyed
+                if (affectedBlocks < 3) {
                     affectedBlocks++;
                     const hitFn = userData.onHit;
                     hits.push(() => hitFn(true));
                 }
             } else if (!userData.isPlayer) {
-                const dist = Math.sqrt(distSq);
-                const force = 0.015; // Slightly reduced force
-                const dirX = dx / (dist || 1);
-                const dirY = dy / (dist || 1);
-                const dirZ = dz / (dist || 1);
+                const dist = Math.sqrt(can.distSq);
+                const force = 0.015;
+                const dirX = can.dx / (dist || 1);
+                const dirY = can.dy / (dist || 1);
+                const dirZ = can.dz / (dist || 1);
 
                 if (!isNaN(dirX) && !isNaN(dirY) && !isNaN(dirZ)) {
                     impulses.push({
-                        body,
-                        impulse: {
-                            x: dirX * force,
-                            y: dirY * force + force,
-                            z: dirZ * force
-                        }
+                        body: can.body,
+                        impulse: { x: dirX * force, y: dirY * force + force, z: dirZ * force }
                     });
                 }
             }
         }
 
-        // EXECUTE: Apply changes deferred to next tick to break call stack if many triggers happen
+        // 4. DEFERRED EXECUTION: Safe physics updates
         setTimeout(() => {
             hits.forEach(h => h());
             impulses.forEach(({ body, impulse }) => {
@@ -215,21 +202,21 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                     restitution={0.2}
                     friction={0.8}
                     colliders="cuboid"
-                    userData={{ isBlock: true, onHit, id: blockId }} // Crucial for connection
+                    userData={{ isBlock: true, onHit, id: blockId }}
                 >
                     <mesh
                         ref={meshRef}
                         castShadow
                         receiveShadow
-                        userData={{ isBlock: true, onHit, id: blockId }} // Backup for Raycaster
+                        userData={{ isBlock: true, onHit, id: blockId }}
                         renderOrder={type === 'portal' && isXRayActive ? 9999 : 0}
                     >
                         <boxGeometry args={type === 'portal' ? [0.3, 0.3, 0.3] : [scale, scale, scale]} />
                         <meshStandardMaterial
                             color={COLORS[type]}
-                            transparent={isXRayActive} // Force true for portal during X-Ray too
+                            transparent={isXRayActive}
                             opacity={type !== 'portal' && isXRayActive ? 0 : 1}
-                            depthWrite={!isXRayActive || type !== 'portal'} // Disable for portal during X-Ray
+                            depthWrite={!isXRayActive || type !== 'portal'}
                             depthTest={type === 'portal' && isXRayActive ? false : true}
                             emissive={COLORS[type]}
                             emissiveIntensity={isXRayActive && type !== 'portal' ? 0 : (type === 'portal' && isXRayActive ? 1.5 : (aimedBlockId === blockId ? 0.2 : (type === 'gold' ? 0.1 : (type === 'explosive' ? 0.2 : (type === 'portal' ? 0.5 : 0)))))}
@@ -244,7 +231,6 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                 </RigidBody>
             )}
 
-            {/* Effects - Using shatterPos which contains the actual impact position */}
             {showAnimeFirework && shatterPos && (
                 <AnimeFirework position={shatterPos} color="#FFD700" onComplete={() => setShowAnimeFirework(false)} />
             )}
@@ -253,7 +239,6 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                 <MinecraftSmoke position={shatterPos} count={30} onComplete={() => setExploding(false)} />
             )}
 
-            {/* Debris - Re-enabled with reduced count (4 pieces) */}
             {shattered && (type === 'standard' || type === 'gold' || type === 'explosive') && shatterPos && (
                 <Shatter
                     position={shatterPos}
@@ -265,4 +250,3 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
         </>
     );
 };
-// Wait, position prop is static initial position. If block fell, we need current position.
