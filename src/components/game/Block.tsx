@@ -75,7 +75,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     });
 
     const onHit = (_fromExplosion = false) => {
-        if (shattered || exploding || hasExploded.current) return;
+        if (shattered || exploding || hasExploded.current || isFusing) return;
 
         if (type === 'portal') {
             useGameStore.getState().setStatus('LEVEL_COMPLETE');
@@ -89,32 +89,37 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             currentPos = [t.x, t.y, t.z];
         }
         setShatterPos(currentPos);
+        setInteracted(true);
 
-        if (type === 'gold') {
-            setShattered(true);
-            incBlocksDestroyed();
-            setInteracted(true);
-            setShowAnimeFirework(true);
-        } else if (type === 'explosive') {
-            if (scale > 0.8) {
-                if (_fromExplosion) {
-                    setShattered(true);
-                    incBlocksDestroyed();
-                    setInteracted(true);
-                } else {
-                    setIsFusing(true);
-                    setInteracted(true);
-                }
-            } else {
+        // MOBILITY FIX: Defer ALL shattering logic to outside the current execution stack
+        // This prevents "Concurrent Modification" crashes in Rapier's WASM module on mobile.
+        setTimeout(() => {
+            if (type === 'gold') {
                 setShattered(true);
                 incBlocksDestroyed();
-                setInteracted(true);
+                setShowAnimeFirework(true);
+            } else if (type === 'explosive') {
+                if (scale > 0.8) {
+                    if (_fromExplosion) {
+                        // VERCEL STABLE: Hit by another explosion = shatter only
+                        setShattered(true);
+                        incBlocksDestroyed();
+                    } else {
+                        // Direct hit = Fuse
+                        setInteracted(true);
+                        setIsFusing(true);
+                    }
+                } else {
+                    // SMALL Red Block - SHATTERS INSTANTLY
+                    setShattered(true);
+                    incBlocksDestroyed();
+                }
+            } else {
+                // STANDARD Block
+                setShattered(true);
+                incBlocksDestroyed();
             }
-        } else {
-            setShattered(true);
-            incBlocksDestroyed();
-            setInteracted(true);
-        }
+        }, 0);
     };
 
     const triggerExplosion = (pos: THREE.Vector3) => {
@@ -124,11 +129,9 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
         const radius = 1.5;
         const { shakeCamera } = useGameStore.getState();
 
-        try {
-            shakeCamera(0.2);
-        } catch (e) { }
+        try { shakeCamera(0.2); } catch (e) { }
 
-        // 1. COLLECT: Gather candidates with distance info
+        // COLLECT: Gather candidates (Stable Pattern)
         const candidates: any[] = [];
         world.forEachCollider((collider: any) => {
             const body = collider.parent();
@@ -144,10 +147,8 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             }
         });
 
-        // 2. SORT: Nearest first to ensure logic picks the closest 3 blocks
         candidates.sort((a, b) => a.distSq - b.distSq);
 
-        // 3. PROCESS: Calculate hits (MAX 3) and impulses
         const hits: Array<() => void> = [];
         const impulses: Array<{ body: any, impulse: { x: number, y: number, z: number } }> = [];
         let affectedBlocks = 0;
@@ -157,13 +158,12 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             if (!userData || userData.id === blockId) continue;
 
             if (userData.isBlock && userData.onHit && !userData.isDebris) {
-                // USER REQUEST: Maximum 3 surrounding blocks destroyed
                 if (affectedBlocks < 3) {
                     affectedBlocks++;
                     const hitFn = userData.onHit;
                     hits.push(() => hitFn(true));
                 }
-            } else if (!userData.isPlayer) {
+            } else if (!can.userData.isPlayer) {
                 const dist = Math.sqrt(can.distSq);
                 const force = 0.015;
                 const dirX = can.dx / (dist || 1);
@@ -179,7 +179,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             }
         }
 
-        // 4. DEFERRED EXECUTION: Safe physics updates
+        // Defer results
         setTimeout(() => {
             hits.forEach(h => h());
             impulses.forEach(({ body, impulse }) => {
@@ -244,7 +244,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                     position={shatterPos}
                     type={type}
                     color={COLORS[type]}
-                    onComplete={() => { }}
+                    onComplete={() => setShattered(false)} // Cleanup state after debris expires
                 />
             )}
         </>
