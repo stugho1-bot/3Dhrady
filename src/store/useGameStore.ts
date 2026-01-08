@@ -88,6 +88,9 @@ interface GameState {
     triggerSwing: () => void;
     setCrouching: (crouching: boolean) => void;
     setAimedBlock: (id: string | null) => void;
+
+    destroyedBlocks: Record<string, boolean>;
+    markBlockDestroyed: (id: string) => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -98,6 +101,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     startTime: Date.now(),
     blocksDestroyed: 0,
     leaderboard: [],
+    destroyedBlocks: {},
 
     addScore: (amount: number) => set((state) => ({ score: state.score + amount })),
 
@@ -107,7 +111,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         status: 'PLAYING',
         resetTimestamp: Date.now(),
         startTime: fullReset ? Date.now() : state.startTime,
-        blocksDestroyed: 0
+        blocksDestroyed: 0,
+        destroyedBlocks: {}
     })),
 
     startLevel: (level) => set((state) => ({
@@ -115,7 +120,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         status: 'PLAYING',
         resetTimestamp: Date.now(),
         startTime: Date.now(),
-        blocksDestroyed: 0
+        blocksDestroyed: 0,
+        destroyedBlocks: {}
     })),
 
     setStatus: (status) => set({ status }),
@@ -163,6 +169,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     setAimedBlock: (id) => set({ aimedBlockId: id }),
     lastSwingTime: 0,
     triggerSwing: () => set({ lastSwingTime: Date.now() }),
+
+    markBlockDestroyed: (id: string) => set((state) => ({
+        destroyedBlocks: { ...state.destroyedBlocks, [id]: true }
+    })),
 
     saveScore: (name: string) => {
         const { level, startTime, blocksDestroyed, leaderboard } = get();

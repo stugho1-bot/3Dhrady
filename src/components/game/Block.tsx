@@ -1,11 +1,10 @@
 import { RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, memo } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGameStore } from "../../store/useGameStore";
 import { AnimeFirework, MinecraftSmoke } from "./Effects";
 import { Shatter } from "./Shatter";
-import { debugLogger } from "../../utils/DebugLogger";
 
 export type BlockType = 'standard' | 'gold' | 'explosive' | 'portal';
 
@@ -24,8 +23,17 @@ const COLORS: Record<BlockType, string> = {
 };
 
 
-export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps) => {
-    const blockId = useMemo(() => id || `block-${position.join('-')}-${Math.random()}`, [id, position]);
+export const Block = memo(({ id, position, type = 'standard', scale = 1 }: BlockProps) => {
+    // ID must be strictly stable based on coordinates to prevent respawning
+    const level = useGameStore(state => state.level);
+    const blockId = useMemo(() => {
+        if (id) return id;
+        const nx = Math.round(position[0]);
+        const ny = Math.round(position[1] * 10) / 10;
+        const nz = Math.round(position[2]);
+        return `b-${nx}-${ny}-${nz}-${level}`;
+    }, [id, position, level]);
+
     const rigidBody = useRef<RapierRigidBody>(null);
     const [isDynamic, _setIsDynamic] = useState(false);
 
@@ -37,12 +45,15 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     const shakeCamera = useGameStore(state => state.shakeCamera);
     const isXRayActive = useGameStore(state => state.isXRayActive);
     const isAimed = useGameStore(state => state.aimedBlockId === blockId);
+    const isDestroyedGlobally = useGameStore(state => !!state.destroyedBlocks[blockId]);
+    const markBlockDestroyed = useGameStore(state => state.markBlockDestroyed);
 
     const [exploding, setExploding] = useState(false);
     const [showAnimeFirework, setShowAnimeFirework] = useState(false);
-    const [shattered, setShattered] = useState(false);
+    // Initialize from global state to survive remounts
+    const [shattered, setShattered] = useState(isDestroyedGlobally);
     const [isRemoved, setIsRemoved] = useState(false);
-    const [shatterPos, setShatterPos] = useState<[number, number, number] | null>(null);
+    const [shatterPos, setShatterPos] = useState<[number, number, number] | null>(isDestroyedGlobally ? position : null);
     const [isFusing, setIsFusing] = useState(false);
     const meshRef = useRef<THREE.Mesh>(null);
     const hasExploded = useRef(false);
@@ -78,7 +89,10 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     const handleDetonation = () => {
         if (hasExploded.current) return;
 
-        // DEFERRED ACTION (Safe Frame)
+        // IMMEDIATE ACTION (Global Store)
+        markBlockDestroyed(blockId);
+
+        // DEFERRED ACTION (Safe Frame for visuals)
         setTimeout(() => {
             setShattered(true);
             setExploding(true);
@@ -98,7 +112,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     };
 
     const onHit = (_fromExplosion = false) => {
-        if (isRemoved || shattered || exploding || hasExploded.current || isProcessingHit.current) return;
+        if (isRemoved || shattered || exploding || hasExploded.current || isProcessingHit.current || isDestroyedGlobally) return;
         if (isFusing && !_fromExplosion) return;
 
         isProcessingHit.current = true;
@@ -116,6 +130,11 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             } catch (e) { }
         }
         setShatterPos(currentPos);
+
+        // IMMEDIATE ACTION (Global Store)
+        if (type !== 'explosive' || _fromExplosion) {
+            markBlockDestroyed(blockId);
+        }
 
         // DEFERRED ACTION (Safe Frame)
         setTimeout(() => {
@@ -206,9 +225,12 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
         }, 0);
     };
 
+    // If destroyed or shattered on mount, hide the main block
+    const shouldHideBlock = isDestroyedGlobally || shattered;
+
     return (
         <group visible={!isRemoved}>
-            {!shattered && (
+            {!shouldHideBlock && (
                 <RigidBody
                     ref={rigidBody}
                     type={isDynamic ? "dynamic" : "fixed"}
@@ -263,4 +285,4 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             )}
         </group>
     );
-};
+});
