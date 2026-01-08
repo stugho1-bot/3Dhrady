@@ -4,7 +4,7 @@ import type { BlockType } from "./Block";
 import { useGameStore } from "../../store/useGameStore";
 
 export const Castle = () => {
-    const { level } = useGameStore();
+    const level = useGameStore(state => state.level);
 
     const blocks = useMemo(() => {
         const b: { position: [number, number, number], type: BlockType, key: string, scale?: number }[] = [];

@@ -44,7 +44,6 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     const [isRemoved, setIsRemoved] = useState(false);
     const [shatterPos, setShatterPos] = useState<[number, number, number] | null>(null);
     const [isFusing, setIsFusing] = useState(false);
-    const [fuseTime, setFuseTime] = useState(0);
     const meshRef = useRef<THREE.Mesh>(null);
     const hasExploded = useRef(false);
     const isProcessingHit = useRef(false);
@@ -66,8 +65,6 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                 if (fuseTimerRef.current >= 1.5) {
                     fuseTimerRef.current = 0;
                     handleDetonation();
-                } else {
-                    setFuseTime(fuseTimerRef.current);
                 }
 
                 // Blink white like Minecraft TNT
@@ -209,10 +206,8 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
         }, 0);
     };
 
-    if (isRemoved) return null;
-
     return (
-        <>
+        <group visible={!isRemoved}>
             {!shattered && (
                 <RigidBody
                     ref={rigidBody}
@@ -238,7 +233,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                             depthWrite={!isXRayActive || type !== 'portal'}
                             depthTest={type === 'portal' && isXRayActive ? false : true}
                             emissive={COLORS[type]}
-                            emissiveIntensity={isXRayActive && type !== 'portal' ? 0 : (isAimed ? 0.2 : (type === 'gold' ? 0.1 : (type === 'explosive' ? 0.2 : (type === 'portal' ? 0.5 : 0)))))}
+                            emissiveIntensity={isXRayActive && type !== 'portal' ? 0 : (isAimed ? 0.2 : (type === 'gold' ? 0.1 : (type === 'explosive' ? 0.2 : (type === 'portal' ? 0.5 : 0))))}
                         />
                         {type !== 'portal' && isXRayActive && (
                             <lineSegments>
@@ -266,6 +261,6 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                     onComplete={() => setIsRemoved(true)}
                 />
             )}
-        </>
+        </group>
     );
 };
