@@ -7,7 +7,7 @@ export const Castle = () => {
     const level = useGameStore(state => state.level);
 
     const blocks = useMemo(() => {
-        const b: { position: [number, number, number], type: BlockType, key: string, scale?: number }[] = [];
+        const b: { position: [number, number, number], type: BlockType, key: string, id: string, scale?: number }[] = [];
         const seed = level * 1337;
 
         // Random helper tied to level and coordinates
@@ -24,13 +24,18 @@ export const Castle = () => {
         };
 
         // UI ID generator to prevent key collisions
-        let blockCount = 0;
         const addBlock = (pos: [number, number, number], type: BlockType, scale = 1) => {
             if (pos[1] < 0.5) return; // Don't spawn below ground
+            // Normalize IDs to avoid float precision issues in keys
+            const nx = Math.round(pos[0]);
+            const ny = Math.round(pos[1] * 10) / 10;
+            const nz = Math.round(pos[2]);
+            const blockId = `b-${nx}-${ny}-${nz}-${level}`;
             b.push({
                 position: pos,
                 type,
-                key: `b-${blockCount++}-${level}`,
+                key: blockId,
+                id: blockId,
                 scale
             });
         };
@@ -217,7 +222,7 @@ export const Castle = () => {
             if (originalIdx > -1) b.splice(originalIdx, 1);
         }
 
-        b.push({ position: portalP, type: 'portal', key: `portal-${level}` });
+        b.push({ position: portalP, type: 'portal', key: `portal-${level}`, id: `portal-${level}` });
 
         return b;
     }, [level]);
@@ -225,7 +230,7 @@ export const Castle = () => {
     return (
         <>
             {blocks.map((block) => (
-                <Block key={block.key} position={block.position} type={block.type} scale={block.scale} />
+                <Block key={block.key} id={block.id} position={block.position} type={block.type} scale={block.scale} />
             ))}
         </>
     );

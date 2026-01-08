@@ -27,22 +27,7 @@ export const Shatter = ({ position, type, color, onComplete }: ShatterProps) => 
     // Refs to individual piece rigid bodies for instant disabling
     const pieceRefs = useRef<Map<number, RapierRigidBody>>(new Map());
 
-    // MOBILITY FIX: Debris shouldn't stay forever (5s)
-    const [timeLeft, setTimeLeft] = useState(5.0);
-    const isCompleted = useRef(false);
 
-    useFrame((_state, delta) => {
-        if (timeLeft > 0) {
-            setTimeLeft(t => {
-                const next = t - delta;
-                if (next <= 0 && !isCompleted.current) {
-                    isCompleted.current = true;
-                    onComplete();
-                }
-                return next;
-            });
-        }
-    });
 
     const handlePieceHit = (id: number, hitPos: THREE.Vector3) => {
         // MOBILITY FIX: 1. Instant physics disabling for the piece
@@ -66,7 +51,7 @@ export const Shatter = ({ position, type, color, onComplete }: ShatterProps) => 
         pieceRefs.current.delete(id);
     };
 
-    if (pieces.length === 0 || timeLeft <= 0) return null;
+    if (pieces.length === 0) return null;
 
     return (
         <>
