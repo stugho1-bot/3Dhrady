@@ -1,4 +1,4 @@
-import { RigidBody } from "@react-three/rapier";
+import { RigidBody, RapierRigidBody } from "@react-three/rapier";
 import { useState, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -24,8 +24,10 @@ export const Shatter = ({ position, type, color, onComplete }: ShatterProps) => 
     const isXRayActive = useGameStore(state => state.isXRayActive);
     const aimedBlockId = useGameStore(state => state.aimedBlockId);
 
-    // MOBILITY FIX: Debris shouldn't stay forever. 5 seconds is plenty.
-    // This prevents memory exhaustion and WASM crashes on mobile.
+    // Refs to individual piece rigid bodies for instant disabling
+    const pieceRefs = useRef<Map<number, RapierRigidBody>>(new Map());
+
+    // MOBILITY FIX: Debris shouldn't stay forever (5s)
     const [timeLeft, setTimeLeft] = useState(5.0);
     const isCompleted = useRef(false);
 
@@ -43,19 +45,25 @@ export const Shatter = ({ position, type, color, onComplete }: ShatterProps) => 
     });
 
     const handlePieceHit = (id: number, hitPos: THREE.Vector3) => {
-        // MOBILITY FIX: Defer removal to outside the current raycast/collision task.
-        // Immediate removal during a physics callback is the #1 cause of "white screen".
+        // MOBILITY FIX: 1. Instant physics disabling for the piece
+        const body = pieceRefs.current.get(id);
+        if (body) {
+            try { body.setEnabled(false); } catch (e) { }
+        }
+
+        // 2. Deferred state removal (Hardened frame delay)
         setTimeout(() => {
             if (type === 'gold') {
                 setPieces(prev => prev.map(p => p.id === id ? { ...p, firework: true, currentPos: [hitPos.x, hitPos.y, hitPos.z] } : p));
             } else {
                 removePiece(id);
             }
-        }, 0);
+        }, 16);
     };
 
     const removePiece = (id: number) => {
         setPieces(prev => prev.filter(p => p.id !== id));
+        pieceRefs.current.delete(id);
     };
 
     if (pieces.length === 0 || timeLeft <= 0) return null;
@@ -66,6 +74,10 @@ export const Shatter = ({ position, type, color, onComplete }: ShatterProps) => 
                 {pieces.filter(p => !p.firework).map((piece) => (
                     <RigidBody
                         key={piece.id}
+                        ref={(ref) => {
+                            if (ref) pieceRefs.current.set(piece.id, ref);
+                            else pieceRefs.current.delete(piece.id);
+                        }}
                         position={piece.offset as [number, number, number]}
                         colliders="cuboid"
                         mass={0.1}

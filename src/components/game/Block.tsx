@@ -30,22 +30,30 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
     const [isDynamic, _setIsDynamic] = useState(false);
 
     const { world } = useRapier();
-    const { incBlocksDestroyed } = useGameStore();
-    const isXRayActive = useGameStore(state => state.isXRayActive);
-    const aimedBlockId = useGameStore(state => state.aimedBlockId);
 
-    const [_interacted, setInteracted] = useState(false);
+    // PERFORMANCE OPTIMIZATION (Mobile): O(1) selectors
+    const incBlocksDestroyed = useGameStore(state => state.incBlocksDestroyed);
+    const setStatus = useGameStore(state => state.setStatus);
+    const shakeCamera = useGameStore(state => state.shakeCamera);
+    const isXRayActive = useGameStore(state => state.isXRayActive);
+    const isAimed = useGameStore(state => state.aimedBlockId === blockId);
+
     const [exploding, setExploding] = useState(false);
     const [showAnimeFirework, setShowAnimeFirework] = useState(false);
     const [shattered, setShattered] = useState(false);
+    const [isRemoved, setIsRemoved] = useState(false);
     const [shatterPos, setShatterPos] = useState<[number, number, number] | null>(null);
     const [isFusing, setIsFusing] = useState(false);
     const [fuseTime, setFuseTime] = useState(0);
     const meshRef = useRef<THREE.Mesh>(null);
     const hasExploded = useRef(false);
+    const isProcessingHit = useRef(false);
+    const fuseTimerRef = useRef(0);
 
     // Portal blinking & TNT fuse blinking
     useFrame(({ clock }, delta) => {
+        if (isRemoved) return;
+
         if (meshRef.current) {
             const material = meshRef.current.material as THREE.MeshStandardMaterial;
 
@@ -53,73 +61,86 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                 const t = clock.getElapsedTime();
                 material.emissiveIntensity = 0.5 + Math.sin(t * 10) * 0.25;
             } else if (isFusing) {
-                setFuseTime(prev => {
-                    const next = prev + delta;
-                    if (next >= 1.5) {
-                        debugLogger.log('EXPLOSION', 'TNT Detonating', { position: shatterPos || position });
-                        setShattered(true);
-                        setExploding(true);
-                        triggerExplosion(new THREE.Vector3(...(shatterPos || position)));
-                        setIsFusing(false);
-                        incBlocksDestroyed();
-                        return 0;
-                    }
-                    return next;
-                });
+                // STABILITY FIX: Move side-effects out of state updaters
+                fuseTimerRef.current += delta;
+                if (fuseTimerRef.current >= 1.5) {
+                    fuseTimerRef.current = 0;
+                    handleDetonation();
+                } else {
+                    setFuseTime(fuseTimerRef.current);
+                }
+
                 // Blink white like Minecraft TNT
-                const blink = Math.floor(fuseTime * 8) % 2 === 0;
+                const blink = Math.floor(fuseTimerRef.current * 8) % 2 === 0;
                 material.emissiveIntensity = blink ? 0.5 : 0;
                 material.emissive.set(blink ? '#ffffff' : COLORS[type]);
             }
         }
     });
 
+    const handleDetonation = () => {
+        if (hasExploded.current) return;
+
+        // DEFERRED ACTION (Safe Frame)
+        setTimeout(() => {
+            setShattered(true);
+            setExploding(true);
+
+            let currentPos = position;
+            if (rigidBody.current) {
+                try {
+                    const t = rigidBody.current.translation();
+                    currentPos = [t.x, t.y, t.z];
+                } catch (e) { }
+            }
+
+            triggerExplosion(new THREE.Vector3(...(currentPos || position)));
+            setIsFusing(false);
+            incBlocksDestroyed();
+        }, 16);
+    };
+
     const onHit = (_fromExplosion = false) => {
-        if (shattered || exploding || hasExploded.current || isFusing) return;
+        if (isRemoved || shattered || exploding || hasExploded.current || isProcessingHit.current) return;
+        if (isFusing && !_fromExplosion) return;
+
+        isProcessingHit.current = true;
 
         if (type === 'portal') {
-            useGameStore.getState().setStatus('LEVEL_COMPLETE');
+            setStatus('LEVEL_COMPLETE');
             return;
         }
 
-        // Capture position for debris
         let currentPos = position;
         if (rigidBody.current) {
-            const t = rigidBody.current.translation();
-            currentPos = [t.x, t.y, t.z];
+            try {
+                const t = rigidBody.current.translation();
+                currentPos = [t.x, t.y, t.z];
+            } catch (e) { }
         }
         setShatterPos(currentPos);
-        setInteracted(true);
 
-        // MOBILITY FIX: Defer ALL shattering logic to outside the current execution stack
-        // This prevents "Concurrent Modification" crashes in Rapier's WASM module on mobile.
+        // DEFERRED ACTION (Safe Frame)
         setTimeout(() => {
             if (type === 'gold') {
                 setShattered(true);
                 incBlocksDestroyed();
                 setShowAnimeFirework(true);
             } else if (type === 'explosive') {
-                if (scale > 0.8) {
-                    if (_fromExplosion) {
-                        // VERCEL STABLE: Hit by another explosion = shatter only
-                        setShattered(true);
-                        incBlocksDestroyed();
-                    } else {
-                        // Direct hit = Fuse
-                        setInteracted(true);
-                        setIsFusing(true);
-                    }
-                } else {
-                    // SMALL Red Block - SHATTERS INSTANTLY
+                if (_fromExplosion) {
+                    // VERCEL LOGIC: Shatter only
                     setShattered(true);
                     incBlocksDestroyed();
+                } else {
+                    // VERCEL LOGIC: Start Fuse
+                    setIsFusing(true);
+                    isProcessingHit.current = false;
                 }
             } else {
-                // STANDARD Block
                 setShattered(true);
                 incBlocksDestroyed();
             }
-        }, 0);
+        }, 16);
     };
 
     const triggerExplosion = (pos: THREE.Vector3) => {
@@ -127,11 +148,8 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
         hasExploded.current = true;
 
         const radius = 1.5;
-        const { shakeCamera } = useGameStore.getState();
-
         try { shakeCamera(0.2); } catch (e) { }
 
-        // COLLECT: Gather candidates (Stable Pattern)
         const candidates: any[] = [];
         world.forEachCollider((collider: any) => {
             const body = collider.parent();
@@ -143,7 +161,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             const distSq = dx * dx + dy * dy + dz * dz;
 
             if (distSq <= radius * radius) {
-                candidates.push({ collider, body, distSq, dx, dy, dz });
+                candidates.push({ body, distSq, dx, dy, dz });
             }
         });
 
@@ -163,7 +181,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                     const hitFn = userData.onHit;
                     hits.push(() => hitFn(true));
                 }
-            } else if (!can.userData.isPlayer) {
+            } else if (!userData.isPlayer) {
                 const dist = Math.sqrt(can.distSq);
                 const force = 0.015;
                 const dirX = can.dx / (dist || 1);
@@ -179,7 +197,6 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             }
         }
 
-        // Defer results
         setTimeout(() => {
             hits.forEach(h => h());
             impulses.forEach(({ body, impulse }) => {
@@ -191,6 +208,8 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
             });
         }, 0);
     };
+
+    if (isRemoved) return null;
 
     return (
         <>
@@ -219,7 +238,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                             depthWrite={!isXRayActive || type !== 'portal'}
                             depthTest={type === 'portal' && isXRayActive ? false : true}
                             emissive={COLORS[type]}
-                            emissiveIntensity={isXRayActive && type !== 'portal' ? 0 : (type === 'portal' && isXRayActive ? 1.5 : (aimedBlockId === blockId ? 0.2 : (type === 'gold' ? 0.1 : (type === 'explosive' ? 0.2 : (type === 'portal' ? 0.5 : 0)))))}
+                            emissiveIntensity={isXRayActive && type !== 'portal' ? 0 : (isAimed ? 0.2 : (type === 'gold' ? 0.1 : (type === 'explosive' ? 0.2 : (type === 'portal' ? 0.5 : 0)))))}
                         />
                         {type !== 'portal' && isXRayActive && (
                             <lineSegments>
@@ -244,7 +263,7 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                     position={shatterPos}
                     type={type}
                     color={COLORS[type]}
-                    onComplete={() => setShattered(false)} // Cleanup state after debris expires
+                    onComplete={() => setIsRemoved(true)}
                 />
             )}
         </>
