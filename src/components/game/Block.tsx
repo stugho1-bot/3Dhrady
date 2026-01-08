@@ -130,13 +130,21 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
 
         shakeCamera(0.2);
 
+        // COLLECT: Gather candidates without any processing/logic to avoid iterator invalidation
+        const candidates: any[] = [];
+        world.forEachCollider((collider: any) => {
+            // Minimal check inside the loop
+            candidates.push(collider);
+        });
+
+        // PROCESS: Filter and calculate logic outside the physics loop
         const hits: Array<() => void> = [];
         const impulses: Array<{ body: any, impulse: { x: number, y: number, z: number } }> = [];
         let affectedBlocks = 0;
 
-        world.forEachCollider((collider: any) => {
+        for (const collider of candidates) {
             const body = collider.parent();
-            if (!body) return;
+            if (!body) continue;
 
             const bodyPos = body.translation();
             const distSq =
@@ -144,18 +152,19 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                 Math.pow(bodyPos.y - pos.y, 2) +
                 Math.pow(bodyPos.z - pos.z, 2);
 
-            if (distSq > radius * radius) return;
+            if (distSq > radius * radius) continue;
 
             const userData = body.userData as { onHit?: (fromExplo?: boolean) => void, isBlock?: boolean, isPlayer?: boolean, isDebris?: boolean };
+            if (!userData) continue;
 
-            if (!userData) return;
-
-            if (userData.isBlock && userData.onHit && !userData.isDebris && affectedBlocks < 9) {
-                affectedBlocks++;
-                // Schedule hit for after loop
-                hits.push(() => userData.onHit?.(true));
+            if (userData.isBlock && userData.onHit && !userData.isDebris) {
+                // Limit chain reaction size
+                if (affectedBlocks < 9) {
+                    affectedBlocks++;
+                    hits.push(() => userData.onHit?.(true));
+                }
             } else if (!userData.isPlayer) {
-                // Apply impulse to debris/other objects
+                // Debris / Items
                 const dist = Math.sqrt(distSq);
                 const force = 0.02;
                 const dirX = (bodyPos.x - pos.x) / (dist || 1);
@@ -173,15 +182,17 @@ export const Block = ({ id, position, type = 'standard', scale = 1 }: BlockProps
                     });
                 }
             }
-        });
+        }
 
-        // SAFETY: Apply all changes AFTER the loop finishes
+        // EXECUTE: Apply changes
         hits.forEach(h => h());
         impulses.forEach(({ body, impulse }) => {
             try {
-                body.applyImpulse(impulse, true);
+                if (body && body.isValid && body.isValid()) {
+                    body.applyImpulse(impulse, true);
+                }
             } catch (e) {
-                // Ignore errors if body was removed by a hit in the same frame
+                // Body might be gone
             }
         });
     };
