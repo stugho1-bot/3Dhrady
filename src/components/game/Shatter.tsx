@@ -37,6 +37,7 @@ export const Shatter = ({ position, type, color, onComplete }: ShatterProps) => 
 
         // 2. Deferred state removal (Hardened frame delay)
         setTimeout(() => {
+            useGameStore.getState().incBlocksDestroyed();
             if (type === 'gold') {
                 setPieces(prev => prev.map(p => p.id === id ? { ...p, firework: true, currentPos: [hitPos.x, hitPos.y, hitPos.z] } : p));
             } else {

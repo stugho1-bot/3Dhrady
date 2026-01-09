@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 
 export const HUD = () => {
     const {
-        score, level, startTime, blocksDestroyed,
+        score, level, startTime, blocksDestroyed, totalBlocks,
         graphicsQuality, setGraphicsQuality,
         showFPS, toggleFPS
     } = useGameStore();
@@ -149,7 +149,7 @@ export const HUD = () => {
                 {/* Moved Metrics Group: Time, Blocks, Score */}
                 <div id="hud-metrics-group" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '10px' }}>
                     <div style={metricStyle}>⏰ TIME: {timeStr}</div>
-                    <div style={metricStyle}>🧱 BLOCKS: {blocksDestroyed || 0}</div>
+                    <div style={metricStyle}>🧱 BLOCKS: {blocksDestroyed || 0}/{totalBlocks || 0}</div>
                     <div style={metricStyle}>🏆 SCORE: {score || 0}</div>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { Block } from "./Block";
 import type { BlockType } from "./Block";
 import { useGameStore } from "../../store/useGameStore";
@@ -226,6 +226,15 @@ export const Castle = () => {
 
         return b;
     }, [level]);
+
+
+    useEffect(() => {
+        const total = blocks.reduce((acc, b) => {
+            if (b.type === 'portal') return acc + 1;
+            return acc + 5;
+        }, 0);
+        useGameStore.getState().setTotalBlocks(total);
+    }, [blocks]);
 
     return (
         <>
