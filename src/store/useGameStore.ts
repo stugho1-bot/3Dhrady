@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../utils/supabase';
 
 export type GameStatus = 'MENU' | 'PLAYING' | 'LEVEL_COMPLETE' | 'GAME_OVER';
 
@@ -148,14 +149,23 @@ export const useGameStore = create<GameState>((set, get) => ({
     touchDelta: { x: 0, y: 0 },
     setTouchDelta: (x, y) => set({ touchDelta: { x, y } }),
 
-    loadLeaderboard: () => {
+    loadLeaderboard: async () => {
         try {
-            const data = localStorage.getItem('castle_crusher_leaderboard');
-            if (data) {
-                set({ leaderboard: JSON.parse(data) });
+            const { data, error } = await supabase
+                .from('leaderboard')
+                .select('*')
+                .order('level', { ascending: false })
+                .order('time', { ascending: true })
+                .limit(10);
+
+            if (error) {
+                // If table doesn't exist yet, we'll see an error here
+                console.warn("Supabase error (possibly table missing):", error.message);
+                return;
             }
+            if (data) set({ leaderboard: data });
         } catch (e) {
-            console.error("Failed to load leaderboard", e);
+            console.error("Failed to load global leaderboard", e);
         }
     },
 
@@ -191,26 +201,38 @@ export const useGameStore = create<GameState>((set, get) => ({
         clearedBlocks: { ...state.clearedBlocks, [id]: true }
     })),
 
-    saveScore: (name: string) => {
-        const { level, startTime, blocksDestroyed, leaderboard } = get();
+    saveScore: async (name: string) => {
+        const { level, startTime, blocksDestroyed } = get();
         const baseTime = (Date.now() - startTime) / 1000;
         const bonus = Math.floor(blocksDestroyed / 10);
         const finalTime = Math.max(0.1, baseTime - bonus);
 
-        const newEntry = {
-            name,
-            time: finalTime,
-            baseTime,
-            bonus,
-            blocksDestroyed,
-            level,
-            date: new Date().toISOString()
-        };
-        const newLeaderboard = [...leaderboard, newEntry]
-            .sort((a, b) => b.level - a.level || a.time - b.time)
-            .slice(0, 10);
+        try {
+            // Save to Supabase
+            const { error } = await supabase
+                .from('leaderboard')
+                .insert([{
+                    name,
+                    time: finalTime,
+                    baseTime,
+                    bonus,
+                    blocksDestroyed,
+                    level,
+                    date: new Date().toISOString()
+                }]);
 
-        set({ leaderboard: newLeaderboard });
-        localStorage.setItem('castle_crusher_leaderboard', JSON.stringify(newLeaderboard));
+            if (error) throw error;
+
+            // Refetch to update UI
+            get().loadLeaderboard();
+        } catch (e) {
+            console.error("Failed to save global score", e);
+            // Local fallback for smooth UX if network fails
+            set(state => ({
+                leaderboard: [...state.leaderboard, {
+                    name, time: finalTime, level, date: new Date().toISOString()
+                }].sort((a, b) => b.level - a.level || a.time - b.time).slice(0, 10)
+            }));
+        }
     },
 }));

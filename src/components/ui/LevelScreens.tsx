@@ -93,7 +93,7 @@ export const LevelComplete = () => {
                     </div>
                     <div className="max-h-32 md:max-h-48 overflow-y-auto p-3 md:p-4 space-y-2">
                         {leaderboard.length === 0 ? (
-                            <div className="text-center text-white/20 py-4 italic">No legends yet...</div>
+                            <div className="text-center text-white/20 py-4 italic animate-pulse">Connecting to global legends...</div>
                         ) : (
                             leaderboard.map((entry, i) => (
                                 <div key={i} className={`flex justify-between items-center p-2 md:p-3 rounded-lg ${entry.name === playerName && submitted ? 'bg-yellow-400/20 border border-yellow-400/30' : 'bg-white/5'}`}>
