@@ -32,11 +32,15 @@ interface GameState {
     level: number;
     status: GameStatus;
     blocksDestroyed: number;
+    totalBlocks: number;
     playerName: string;
     isCrouching: boolean;
     aimedBlockId: string | null;
+    hammerLightColor: string;
 
     addScore: (amount: number) => void;
+    setHammerLightColor: (color: string) => void;
+    setTotalBlocks: (total: number) => void;
     resetGame: (fullReset?: boolean) => void;
     startLevel: (level?: number) => void;
     setStatus: (status: GameStatus) => void;
@@ -105,8 +109,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     leaderboard: [],
     destroyedBlocks: {},
     clearedBlocks: {},
+    totalBlocks: 0,
+    hammerLightColor: '#ffd43b',
 
     addScore: (amount: number) => set((state) => ({ score: state.score + amount })),
+    setHammerLightColor: (color: string) => set({ hammerLightColor: color }),
+    setTotalBlocks: (total: number) => set({ totalBlocks: total }),
 
     resetGame: (fullReset = false) => set((state) => ({
         score: fullReset ? 0 : state.score,

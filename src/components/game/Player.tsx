@@ -39,6 +39,12 @@ export const Player = () => {
         const onDown = (e: KeyboardEvent) => {
             keysPressed.current.add(e.code);
 
+            // Hammer Light Color Toggle: RightShift + C
+            if (keysPressed.current.has('ShiftRight') && e.code === 'KeyC') {
+                const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+                useGameStore.getState().setHammerLightColor(randomColor);
+            }
+
             // X-Ray Toggle logic: RightShift + T
             if (keysPressed.current.has('ShiftRight') && e.code === 'KeyT') {
                 setXRayActive(!useGameStore.getState().isXRayActive);

@@ -2,6 +2,7 @@ import { useRef, forwardRef, useImperativeHandle } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { easing } from "maath";
+import { useGameStore } from "../../store/useGameStore";
 
 export interface HammerRef {
     swing: () => void;
@@ -11,6 +12,7 @@ export const Hammer = forwardRef<HammerRef, any>((_props, ref) => {
     const group = useRef<THREE.Group>(null);
     const rotationTarget = useRef(0);
     const isSwinging = useRef(false);
+    const hammerLightColor = useGameStore(state => state.hammerLightColor);
 
     useImperativeHandle(ref, () => ({
         swing: () => {
@@ -59,7 +61,7 @@ export const Hammer = forwardRef<HammerRef, any>((_props, ref) => {
             </mesh>
 
             {/* Torch Light - Added back at user request as a Minecraft-style torch */}
-            <pointLight position={[0, 0.25, 0]} intensity={2} distance={15} color="#ffd43b" decay={2} castShadow={false} />
+            <pointLight position={[0, 0.25, 0]} intensity={2} distance={15} color={hammerLightColor} decay={2} castShadow={false} />
         </group>
     );
 });
