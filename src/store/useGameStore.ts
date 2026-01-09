@@ -51,15 +51,19 @@ interface GameState {
 
     // Timer & Leaderboard
     startTime: number;
-    leaderboard: {
+    localLeaderboard: {
         name: string;
         time: number;
         level: number;
-        baseTime?: number;
-        bonus?: number;
-        blocksDestroyed?: number;
         date?: string;
     }[];
+    globalLeaderboard: {
+        name: string;
+        time: number;
+        level: number;
+        date?: string;
+    }[];
+    isLoadingGlobal: boolean;
 
     // Mobile Controls
     joystick: { x: number; y: number };
@@ -107,7 +111,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     resetTimestamp: 0,
     startTime: Date.now(),
     blocksDestroyed: 0,
-    leaderboard: [],
+    localLeaderboard: [],
+    globalLeaderboard: [],
+    isLoadingGlobal: false,
     destroyedBlocks: {},
     clearedBlocks: {},
     totalBlocks: 0,
@@ -150,6 +156,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     setTouchDelta: (x, y) => set({ touchDelta: { x, y } }),
 
     loadLeaderboard: async () => {
+        // 1. Load Local Leaderboard (Synchronous/Instant)
+        try {
+            const localData = localStorage.getItem('castle_crusher_leaderboard');
+            if (localData) {
+                set({ localLeaderboard: JSON.parse(localData) });
+            }
+        } catch (e) {
+            console.error("Failed to load local leaderboard", e);
+        }
+
+        // 2. Load Global Leaderboard (Async)
+        set({ isLoadingGlobal: true });
         try {
             const { data, error } = await supabase
                 .from('leaderboard')
@@ -158,14 +176,13 @@ export const useGameStore = create<GameState>((set, get) => ({
                 .order('time', { ascending: true })
                 .limit(10);
 
-            if (error) {
-                // If table doesn't exist yet, we'll see an error here
-                console.warn("Supabase error (possibly table missing):", error.message);
-                return;
+            if (!error && data) {
+                set({ globalLeaderboard: data });
             }
-            if (data) set({ leaderboard: data });
         } catch (e) {
             console.error("Failed to load global leaderboard", e);
+        } finally {
+            set({ isLoadingGlobal: false });
         }
     },
 
@@ -202,14 +219,29 @@ export const useGameStore = create<GameState>((set, get) => ({
     })),
 
     saveScore: async (name: string) => {
-        const { level, startTime, blocksDestroyed } = get();
+        const { level, startTime, blocksDestroyed, localLeaderboard } = get();
         const baseTime = (Date.now() - startTime) / 1000;
         const bonus = Math.floor(blocksDestroyed / 10);
         const finalTime = Math.max(0.1, baseTime - bonus);
 
+        const newEntry = {
+            name,
+            time: finalTime,
+            level,
+            date: new Date().toISOString()
+        };
+
+        // 1. Always save Locally first
+        const newLocal = [...localLeaderboard, newEntry]
+            .sort((a, b) => b.level - a.level || a.time - b.time)
+            .slice(0, 10);
+
+        set({ localLeaderboard: newLocal });
+        localStorage.setItem('castle_crusher_leaderboard', JSON.stringify(newLocal));
+
+        // 2. Attempt to save Globally
         try {
-            // Save to Supabase
-            const { error } = await supabase
+            await supabase
                 .from('leaderboard')
                 .insert([{
                     name,
@@ -218,21 +250,13 @@ export const useGameStore = create<GameState>((set, get) => ({
                     bonus,
                     blocksDestroyed,
                     level,
-                    date: new Date().toISOString()
+                    date: newEntry.date
                 }]);
 
-            if (error) throw error;
-
-            // Refetch to update UI
+            // Refresh global data
             get().loadLeaderboard();
         } catch (e) {
             console.error("Failed to save global score", e);
-            // Local fallback for smooth UX if network fails
-            set(state => ({
-                leaderboard: [...state.leaderboard, {
-                    name, time: finalTime, level, date: new Date().toISOString()
-                }].sort((a, b) => b.level - a.level || a.time - b.time).slice(0, 10)
-            }));
         }
     },
 }));
