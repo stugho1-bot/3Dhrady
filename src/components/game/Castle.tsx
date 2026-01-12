@@ -7,7 +7,13 @@ export const Castle = () => {
     const level = useGameStore(state => state.level);
 
     const blocks = useMemo(() => {
-        const b: { position: [number, number, number], type: BlockType, key: string, id: string, scale?: number }[] = [];
+        const b: {
+            position: [number, number, number],
+            type: BlockType,
+            key: string,
+            id: string,
+            scale?: number
+        }[] = [];
         const seed = level * 1337;
 
         // Random helper tied to level and coordinates
@@ -183,46 +189,71 @@ export const Castle = () => {
         }
 
         // --- PORTAL PLACEMENT ---
-        // const variant = (level - 1) % 5;
-        let portalP: [number, number, number] = [0, 1.5, 0];
+        // New rules:
+        // 1. Never in the bottom half of the castle
+        // 2. Levels 1-25: Always in the higher floors
 
-        if (level <= 2) {
-            // Level 1-2: Always somewhere HIGH and visible
-            let maxH = 0;
-            b.forEach(bl => { if (bl.position[1] > maxH) maxH = bl.position[1]; });
-            const topBlocks = b.filter(bl => bl.position[1] === maxH);
-            if (topBlocks.length > 0) {
-                // Pick a random block from the top layer
-                const target = topBlocks[Math.floor(rnd(level, 0, 0) * topBlocks.length)];
-                portalP = [...target.position] as [number, number, number];
-                // Remove the block being replaced
-                const idx = b.indexOf(target);
-                if (idx > -1) b.splice(idx, 1);
-            }
-        } else {
-            // Level 3+: Hidden INSIDE (don't pick blocks on the extreme horizontal edges)
+        const maxY = Math.max(...b.map(bl => bl.position[1]));
+        const minY = Math.min(...b.map(bl => bl.position[1]));
+        const castleHeight = maxY - minY;
+        const midY = minY + castleHeight / 2;
+
+        // Filter blocks based on height rules
+        let candidateBlocks = b.filter(bl => bl.position[1] >= midY);
+
+        // For first half of levels (1-25), be even more strict: top 30% of floors
+        if (level <= 25) {
+            candidateBlocks = candidateBlocks.filter(bl => bl.position[1] >= minY + castleHeight * 0.7);
+        }
+
+        // Hull Selection Logic (Visible from outside)
+        const isEarly = level <= 3;
+        const isCycleVisible = level <= 25 && level % 2 === 0;
+
+        if (isEarly || isCycleVisible) {
             const minX = Math.min(...b.map(bl => bl.position[0]));
             const maxX = Math.max(...b.map(bl => bl.position[0]));
             const minZ = Math.min(...b.map(bl => bl.position[2]));
             const maxZ = Math.max(...b.map(bl => bl.position[2]));
 
-            // Filter blocks that are strictly inside the horizontal bounds
-            const internalBlocks = b.filter(bl =>
-                bl.position[0] > minX && bl.position[0] < maxX &&
-                bl.position[2] > minZ && bl.position[2] < maxZ &&
-                bl.position[1] > 0.5 // Usually not the very bottom floor if possible
+            const hullCandidates = candidateBlocks.filter(bl =>
+                bl.position[0] === minX || bl.position[0] === maxX ||
+                bl.position[2] === minZ || bl.position[2] === maxZ
             );
 
-            const pool = internalBlocks.length > 0 ? internalBlocks : b;
-            const idxInPool = Math.floor(rnd(level, level, level) * pool.length);
-            const target = pool[idxInPool];
-            portalP = [...target.position] as [number, number, number];
+            if (hullCandidates.length > 0) candidateBlocks = hullCandidates;
+        } else if (level >= 4) {
+            // Hidden INSIDE logic for other levels
+            const minX = Math.min(...b.map(bl => bl.position[0]));
+            const maxX = Math.max(...b.map(bl => bl.position[0]));
+            const minZ = Math.min(...b.map(bl => bl.position[2]));
+            const maxZ = Math.max(...b.map(bl => bl.position[2]));
 
-            const originalIdx = b.indexOf(target);
-            if (originalIdx > -1) b.splice(originalIdx, 1);
+            const internalCandidates = candidateBlocks.filter(bl =>
+                bl.position[0] > minX && bl.position[0] < maxX &&
+                bl.position[2] > minZ && bl.position[2] < maxZ
+            );
+
+            if (internalCandidates.length > 0) candidateBlocks = internalCandidates;
         }
 
-        b.push({ position: portalP, type: 'portal', key: `portal-${level}`, id: `portal-${level}` });
+        if (candidateBlocks.length === 0) {
+            candidateBlocks = b.filter(bl => bl.position[1] === maxY);
+        }
+
+        const target = candidateBlocks[Math.floor(rnd(level, level, level) * candidateBlocks.length)];
+        const portalP: [number, number, number] = [...target.position] as [number, number, number];
+
+        // Remove the block being replaced
+        const originalIdx = b.indexOf(target);
+        if (originalIdx > -1) b.splice(originalIdx, 1);
+
+        b.push({
+            position: portalP,
+            type: 'portal',
+            key: `portal-${level}`,
+            id: `portal-${level}`
+        });
 
         return b;
     }, [level]);
@@ -239,7 +270,13 @@ export const Castle = () => {
     return (
         <>
             {blocks.map((block) => (
-                <Block key={block.key} id={block.id} position={block.position} type={block.type} scale={block.scale} />
+                <Block
+                    key={block.key}
+                    id={block.id}
+                    position={block.position}
+                    type={block.type}
+                    scale={block.scale}
+                />
             ))}
         </>
     );

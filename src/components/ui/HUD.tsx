@@ -12,6 +12,7 @@ export const HUD = () => {
     const [showMessage, setShowMessage] = useState(true);
     const [showSettings, setShowSettings] = useState(false);
     const [fps, setFps] = useState(0);
+    const [fpsHistory, setFpsHistory] = useState<number[]>([]);
 
     // Timer Logic
     useEffect(() => {
@@ -61,6 +62,12 @@ export const HUD = () => {
                     };
                 });
 
+                setFpsHistory(prev => {
+                    const next = [...prev, currentFps];
+                    if (next.length > 50) return next.slice(1);
+                    return next;
+                });
+
                 frameCount = 0;
                 lastTime = now;
             }
@@ -102,12 +109,28 @@ export const HUD = () => {
                 <div style={{
                     position: 'absolute', top: '10px', right: '10px',
                     color: '#00ff00', fontSize: '10px', textAlign: 'right',
-                    background: 'rgba(0,0,0,0.5)', padding: '5px', borderRadius: '4px'
+                    background: 'rgba(0,0,0,0.5)', padding: '5px', borderRadius: '4px',
+                    display: 'flex', gap: '8px', alignItems: 'center'
                 }}>
-                    <div>FPS: {fps}</div>
-                    <div style={{ opacity: 0.7 }}>
-                        MIN: {fpsStats.min} MAX: {fpsStats.max}<br />
-                        AVG: {fpsStats.avg}
+                    {/* FPS Graph */}
+                    <div style={{ display: 'flex', alignItems: 'flex-end', height: '20px', gap: '1px' }}>
+                        {fpsHistory.map((val, i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    width: '2px',
+                                    height: `${Math.min(100, (val / 120) * 100)}%`,
+                                    background: val > 50 ? '#00ff00' : (val > 30 ? '#ffff00' : '#ff0000'),
+                                    opacity: 0.8
+                                }}
+                            />
+                        ))}
+                    </div>
+                    <div>
+                        <div>FPS: {fps}</div>
+                        <div style={{ opacity: 0.7 }}>
+                            MIN: {fpsStats.min} AVG: {fpsStats.avg}
+                        </div>
                     </div>
                 </div>
             )}
@@ -121,7 +144,7 @@ export const HUD = () => {
                     fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                     animation: 'pulse 2s infinite'
                 }}>
-                    Najdi a znič zelenou kostku! 💚
+                    Najdi a znič zelenou kostku 🟩
                 </div>
             )}
 
@@ -130,27 +153,33 @@ export const HUD = () => {
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={metricStyle}>{getLevelName(level)}</div>
                     <button style={buttonStyle} onClick={() => setShowSettings(true)}>⚙️</button>
+                    <button
+                        style={{ ...buttonStyle, background: 'rgba(0, 0, 0, 0.4)' }}
+                        onClick={() => useGameStore.getState().setStatus('MENU')}
+                    >
+                        MENU
+                    </button>
                 </div>
-                {/* Retry Level Button moved here for better mobile reach/UX */}
+                {/* Restart Level Button */}
                 <button
                     style={{
-                        background: 'rgba(153, 0, 0, 0.8)', color: 'white', fontWeight: 'bold',
+                        background: 'rgba(153, 0, 0, 0.8)', color: 'white', fontStretch: 'condensed', fontWeight: '900',
                         padding: '10px 20px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.3)',
-                        cursor: 'pointer', textTransform: 'uppercase', width: 'fit-content', fontSize: '12px'
+                        cursor: 'pointer', textTransform: 'uppercase', width: 'fit-content', fontSize: '10px', letterSpacing: '1px'
                     }}
                     onClick={() => {
                         const state = useGameStore.getState();
                         state.startLevel(state.level);
                     }}
                 >
-                    RETRY LEVEL
+                    RESTART LEVELU
                 </button>
 
                 {/* Moved Metrics Group: Time, Blocks, Score */}
                 <div id="hud-metrics-group" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '10px' }}>
-                    <div style={metricStyle}>⏰ TIME: {timeStr}</div>
-                    <div style={metricStyle}>🧱 BLOCKS: {blocksDestroyed || 0}/{totalBlocks || 0}</div>
-                    <div style={metricStyle}>🏆 SCORE: {score || 0}</div>
+                    <div style={metricStyle}>⏰ ČAS: {timeStr}</div>
+                    <div style={metricStyle}>🧱 BLOKY: {blocksDestroyed || 0}/{totalBlocks || 0}</div>
+                    <div style={metricStyle}>🏆 SKÓRE: {score || 0}</div>
                 </div>
             </div>
 
@@ -187,8 +216,8 @@ export const HUD = () => {
                         </button>
                     </div>
 
-                    <p style={{ fontSize: '10px', color: '#888', marginTop: '10px' }}>
-                        HINT: Shift+T aktivuje průhlednost hradu (X-Ray).
+                    <p style={{ fontSize: '10px', color: '#555', marginTop: '10px', textAlign: 'center' }}>
+                        Hradní Bourač v1.2
                     </p>
 
                     <button

@@ -102,6 +102,10 @@ interface GameState {
     markBlockDestroyed: (id: string) => void;
     clearedBlocks: Record<string, boolean>;
     markBlockCleared: (id: string) => void;
+
+    // Persistence for "Continue"
+    lastUnlockedLevel: number;
+    lastUnlockedPassword: string;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -118,6 +122,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     clearedBlocks: {},
     totalBlocks: 0,
     hammerLightColor: '#ffd43b',
+    lastUnlockedLevel: Number(localStorage.getItem('castle_crusher_last_level')) || 1,
+    lastUnlockedPassword: localStorage.getItem('castle_crusher_last_password') || '',
 
     addScore: (amount: number) => set((state) => ({ score: state.score + amount })),
     setHammerLightColor: (color: string) => set({ hammerLightColor: color }),
@@ -134,15 +140,26 @@ export const useGameStore = create<GameState>((set, get) => ({
         clearedBlocks: {}
     })),
 
-    startLevel: (level) => set((state) => ({
-        level: level || state.level,
-        status: 'PLAYING',
-        resetTimestamp: Date.now(),
-        startTime: Date.now(),
-        blocksDestroyed: 0,
-        destroyedBlocks: {},
-        clearedBlocks: {}
-    })),
+    startLevel: (level) => {
+        const nextLevel = level || get().level;
+        const password = getPasswordForLevel(nextLevel);
+
+        // Persist progress
+        localStorage.setItem('castle_crusher_last_level', nextLevel.toString());
+        localStorage.setItem('castle_crusher_last_password', password);
+
+        set({
+            level: nextLevel,
+            status: 'PLAYING',
+            resetTimestamp: Date.now(),
+            startTime: Date.now(),
+            blocksDestroyed: 0,
+            destroyedBlocks: {},
+            clearedBlocks: {},
+            lastUnlockedLevel: nextLevel,
+            lastUnlockedPassword: password
+        });
+    },
 
     setStatus: (status) => set({ status }),
 

@@ -106,7 +106,7 @@ export const MobileControls = () => {
                     setJumping(false);
                 }}
             >
-                JUMP
+                SKOK
             </button>
         </div>
     );

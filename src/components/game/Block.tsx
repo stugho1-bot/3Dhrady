@@ -269,17 +269,17 @@ export const Block = memo(({ id, position, type = 'standard', scale = 1 }: Block
                         castShadow
                         receiveShadow
                         userData={{ isBlock: true, onHit, id: blockId }}
-                        renderOrder={type === 'portal' && isXRayActive ? 9999 : 0}
+                        renderOrder={(type === 'portal' && isXRayActive) ? 9999 : 0}
                     >
                         <boxGeometry args={type === 'portal' ? [0.3, 0.3, 0.3] : [scale, scale, scale]} />
                         <meshStandardMaterial
                             color={COLORS[type]}
-                            transparent={isXRayActive}
-                            opacity={type !== 'portal' && isXRayActive ? 0 : 1}
-                            depthWrite={!isXRayActive || type !== 'portal'}
-                            depthTest={type === 'portal' && isXRayActive ? false : true}
+                            transparent={isXRayActive && type !== 'portal'}
+                            opacity={(isXRayActive && type !== 'portal') ? 0.35 : 1}
+                            depthWrite={!(isXRayActive && type === 'portal')}
+                            depthTest={(type === 'portal' && isXRayActive) ? false : true}
                             emissive={COLORS[type]}
-                            emissiveIntensity={isXRayActive && type !== 'portal' ? 0 : (isAimed ? 0.2 : (type === 'gold' ? 0.1 : (type === 'explosive' ? 0.2 : (type === 'portal' ? 0.5 : 0))))}
+                            emissiveIntensity={(isXRayActive && type !== 'portal') ? 0 : (isAimed ? 0.2 : (type === 'gold' ? 0.1 : (type === 'explosive' ? 0.2 : (type === 'portal' ? 0.5 : 0))))}
                         />
                         {type !== 'portal' && isXRayActive && (
                             <lineSegments>

@@ -2,6 +2,7 @@ import { Sky, Stars } from "@react-three/drei";
 import { RigidBody } from "@react-three/rapier";
 import { useGameStore } from "../../store/useGameStore";
 import { Car } from "./Car";
+import { Trees } from "./Trees";
 
 export const World = () => {
     const level = useGameStore(state => state.level);
@@ -23,6 +24,8 @@ export const World = () => {
             {level % 2 === 0 && (
                 <Car position={[20, 0, 10]} />
             )}
+
+            <Trees level={level} />
 
             {/* Ground Physics & Visuals */}
             <RigidBody type="fixed" position={[0, -1, 0]} restitution={0} friction={1}>

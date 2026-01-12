@@ -1,64 +1,126 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore, getPasswordForLevel } from '../../store/useGameStore';
 
 export const MainMenu = () => {
-    const { startLevel } = useGameStore();
-    const [password, setPassword] = useState("");
+    const { startLevel, lastUnlockedPassword, setStatus, resetTimestamp } = useGameStore();
+    const isGameActive = resetTimestamp > 0;
+    const [password, setPassword] = useState(lastUnlockedPassword || "");
     const [error, setError] = useState("");
+    const [showPasswordInput, setShowPasswordInput] = useState(false);
+
+    useEffect(() => {
+        setPassword(lastUnlockedPassword || "");
+    }, [lastUnlockedPassword]);
 
     const handleStart = () => {
         startLevel(1);
     };
 
-    const handlePassword = () => {
+    const handleContinue = () => {
         for (let i = 1; i <= 50; i++) {
             if (getPasswordForLevel(i) === password.trim()) {
                 startLevel(i);
                 return;
             }
         }
-        setError("Invalid Password");
+        setError("Neplatné heslo");
     };
 
     return (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 50 }} className="bg-gradient-to-b from-black/60 via-transparent to-black/80 flex flex-col items-center justify-between text-white p-4">
-            <div className="mt-20 text-center">
-                <h1 className="text-4xl md:text-6xl font-bold mb-2 text-yellow-500 drop-shadow-[0_4px_4px_rgba(0,0,0,1)]">Hradní Bourač</h1>
-                <p className="text-gray-300 drop-shadow-md pb-4">Destruction Physics Game</p>
-            </div>
+        <div className="absolute inset-0 z-50 bg-gradient-to-br from-slate-950 via-black to-slate-900 flex flex-col items-center justify-center p-6 font-sans">
+            <div className="max-w-md w-full flex flex-col gap-12 animate-in fade-in zoom-in duration-700">
+                {/* Logo & Header */}
+                <div className="text-center space-y-4">
+                    <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-400 to-orange-600 drop-shadow-2xl uppercase tracking-tighter italic">
+                        HRADNÍ<br />BOUŘAČ
+                    </h1>
+                    <p className="text-white/40 font-bold uppercase tracking-[0.3em] text-xs">Simulátor destrukce hradů</p>
+                </div>
 
-            <div className="flex flex-col items-center gap-6 mb-20 bg-black/40 p-8 rounded-xl backdrop-blur-md border border-white/10">
-                <button
-                    onClick={handleStart}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-12 rounded-lg text-xl shadow-lg active:scale-95 transition-transform w-full"
-                >
-                    START GAME
-                </button>
+                {/* Menu Options */}
+                <div className="flex flex-col gap-3">
+                    <button
+                        onClick={handleStart}
+                        className="group relative bg-white text-black font-black py-5 rounded-2xl text-2xl uppercase shadow-[0_10px_40px_rgba(255,255,255,0.1)] hover:shadow-[0_15px_60px_rgba(255,255,255,0.2)] hover:-translate-y-1 active:translate-y-0 active:scale-95 transition-all overflow-hidden"
+                    >
+                        <span className="relative z-10">Nová hra</span>
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                    </button>
 
-                <div className="flex flex-col items-center gap-2 w-full">
-                    <label className="text-gray-300 text-sm uppercase tracking-wide">Enter Level Password</label>
-                    <div className="flex gap-2 w-full">
-                        <input
-                            type="text"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="bg-gray-800/80 border border-gray-600 rounded px-4 py-2 text-white focus:outline-none focus:border-yellow-500 w-full font-mono text-center"
-                            placeholder="heslo-..."
-                        />
+                    {isGameActive && (
                         <button
-                            onClick={handlePassword}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow active:scale-95"
+                            onClick={() => setStatus('PLAYING')}
+                            className="group relative bg-cyan-500 text-black font-black py-4 rounded-2xl text-xl uppercase shadow-[0_10px_40px_rgba(0,255,255,0.1)] hover:shadow-[0_15px_60px_rgba(0,255,255,0.2)] hover:-translate-y-1 active:translate-y-0 active:scale-95 transition-all overflow-hidden"
                         >
-                            LOAD
+                            <span className="relative z-10">Zpět do hry</span>
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                        </button>
+                    )}
+
+                    <div className="flex flex-col gap-2">
+                        {!showPasswordInput ? (
+                            <button
+                                onClick={() => setShowPasswordInput(true)}
+                                className="bg-white/5 border border-white/10 text-white font-black py-4 rounded-xl text-xl uppercase hover:bg-white/10 active:scale-95 transition-all text-center"
+                            >
+                                Pokračovat
+                            </button>
+                        ) : (
+                            <div className="flex flex-col gap-2 animate-in slide-in-from-top-2 duration-300">
+                                <div className="flex gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
+                                    <input
+                                        type="text"
+                                        value={password}
+                                        onChange={(e) => {
+                                            setPassword(e.target.value.toLowerCase());
+                                            setError("");
+                                        }}
+                                        className="bg-transparent text-center text-xl p-2 text-white focus:outline-none flex-1 font-mono uppercase placeholder-white/5"
+                                        placeholder="Zadej heslo..."
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={handleContinue}
+                                        className="bg-cyan-500 hover:bg-cyan-600 text-black font-black px-4 py-2 rounded-lg uppercase transition-colors"
+                                    >
+                                        Vstoupit
+                                    </button>
+                                </div>
+                                {error && <div className="text-red-500 text-xs font-bold text-center uppercase tracking-widest">{error}</div>}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                        <button
+                            onClick={() => setStatus('LEVEL_COMPLETE')} // This is a hack to show leaderboard screen, or we can add a specific screen
+                            className="bg-black/20 border border-white/5 text-white/60 font-black py-3 rounded-xl uppercase tracking-widest text-xs hover:bg-white/5 transition-all"
+                        >
+                            Žebříčky
+                        </button>
+                        <button
+                            className="bg-black/20 border border-white/5 text-white/60 font-black py-3 rounded-xl uppercase tracking-widest text-xs hover:bg-white/5 transition-all"
+                        >
+                            Nastavení
                         </button>
                     </div>
-                </div>
-                {error && <div className="text-red-500 font-bold bg-black/50 px-2 rounded animate-pulse">{error}</div>}
-            </div>
 
-            <div className="text-gray-400 text-xs text-center drop-shadow-md">
-                Hint: Destroy the castle. Hit the <span className="text-green-400 font-bold">Green Portal</span> to advance. <br />
-                Controls: WASD + Space (PC) or On-screen Joystick (Mobile).
+                    <a
+                        href="https://donate-link"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 text-center text-[10px] font-bold text-white/20 uppercase tracking-[0.5em] hover:text-white/40 transition-colors"
+                    >
+                        Příspěvek na vývoj (Donate)
+                    </a>
+                </div>
+
+                {/* Footer Info */}
+                <div className="text-center">
+                    <div className="text-[10px] font-bold text-white/10 uppercase tracking-widest">
+                        Znič hrad a najdi zelený portál k postupu.
+                    </div>
+                </div>
             </div>
         </div>
     );
